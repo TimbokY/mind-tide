@@ -30,6 +30,7 @@ pub struct AiAnalysisResult {
     pub primary_mood: String,
     pub mood_score: i32,
     pub emotions: String,
+    pub tags: Vec<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -205,12 +206,34 @@ pub async fn analyze_dream(
 
     let conn = db.conn.lock().map_err(|e| e.to_string())?;
 
+    let existing_tags_json: Option<String> = conn
+        .query_row(
+            "SELECT tags FROM dreams WHERE id = ?1",
+            rusqlite::params![input.dream_id],
+            |row| row.get(0),
+        )
+        .ok()
+        .flatten();
+
+    let mut merged_tags: Vec<String> = if let Some(ref t) = existing_tags_json {
+        serde_json::from_str(t).unwrap_or_else(|_| Vec::new())
+    } else {
+        Vec::new()
+    };
+    for tag in &ai_result.tags {
+        if !merged_tags.contains(tag) {
+            merged_tags.push(tag.clone());
+        }
+    }
+    let merged_tags_json = serde_json::to_string(&merged_tags).unwrap_or_default();
+
     conn.execute(
-        "UPDATE dreams SET ai_mood = ?1, mood_score = ?2, emotions = ?3, updated_at = datetime('now','localtime') WHERE id = ?4",
+        "UPDATE dreams SET ai_mood = ?1, mood_score = ?2, emotions = ?3, tags = ?4, updated_at = datetime('now','localtime') WHERE id = ?5",
         rusqlite::params![
             ai_result.emotion_analysis.primary_mood,
             ai_result.emotion_analysis.mood_score,
             emotions_json,
+            merged_tags_json,
             input.dream_id,
         ],
     )
@@ -266,6 +289,7 @@ pub async fn analyze_dream(
         primary_mood: ai_result.emotion_analysis.primary_mood,
         mood_score: ai_result.emotion_analysis.mood_score,
         emotions: emotions_json,
+        tags: merged_tags,
     })
 }
 
@@ -478,9 +502,11 @@ pub fn clear_all_dreams(db: State<Database>) -> Result<String, String> {
         .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM analyses", [])
         .map_err(|e| e.to_string())?;
+    conn.execute("DELETE FROM ai_summaries", [])
+        .map_err(|e| e.to_string())?;
     conn.execute("DELETE FROM dreams", [])
         .map_err(|e| e.to_string())?;
-    log::info!("已清除全部 {} 条梦境记录", count);
+    log::info!("已清除全部 {} 条梦境记录及关联数据", count);
     Ok(format!("已清除全部 {} 条梦境记录", count))
 }
 
@@ -776,32 +802,46 @@ pub async fn generate_monthly_insight(
         .iter()
         .enumerate()
         .map(|(i, d)| {
+            let mood_cn = match d.ai_mood.as_deref() {
+                Some("joy") => "喜悦",
+                Some("sadness") => "悲伤",
+                Some("fear") => "恐惧",
+                Some("anger") => "愤怒",
+                Some("surprise") => "惊讶",
+                Some("calm") => "平静",
+                _ => "无",
+            };
             let mut line = format!(
-                "{}. {}（日期:{} 情绪分:{} 情绪:{} 清醒度:{}）",
-                i + 1, d.title, d.dream_date, d.mood_score,
-                d.ai_mood.as_deref().unwrap_or("无"),
-                d.lucidity,
+                "{}. [{}] {}(分:{},情绪:{},清醒:{})",
+                i + 1, &d.dream_date[5..], d.title, d.mood_score, mood_cn, d.lucidity,
             );
             if let Some(ref s) = d.summary {
-                line.push_str(&format!("\n   摘要: {}", s));
+                let shortened = if s.chars().count() > 30 {
+                    format!("{}…", s.chars().take(30).collect::<String>())
+                } else {
+                    s.clone()
+                };
+                line.push_str(&format!(" - {}", shortened));
             }
+            let mut symbol_text = String::new();
             if let Some(ref s) = d.symbols {
                 if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(s) {
                     let elements: Vec<&str> = arr.iter()
                         .filter_map(|v| v["element"].as_str())
+                        .take(3)
                         .collect();
                     if !elements.is_empty() {
-                        line.push_str(&format!("\n   象征: {}", elements.join(", ")));
+                        symbol_text = format!(" [{}]", elements.join(","));
                     }
                 }
             }
-            if let Some(ref s) = d.insight {
-                line.push_str(&format!("\n   洞察: {}", s));
+            if !symbol_text.is_empty() {
+                line.push_str(&symbol_text);
             }
             line
         })
         .collect::<Vec<_>>()
-        .join("\n\n");
+        .join("\n");
 
     let last_month_comparison = get_last_month_comparison(&db, input.year, input.month);
 
@@ -821,14 +861,39 @@ pub async fn generate_monthly_insight(
         .replace("{calm_avg}", &calm_avg.to_string())
         .replace("{last_month_comparison}", &last_month_comparison);
 
+    log::info!("月度洞察 prompt 长度: {} 字符", prompt.len());
     let result = if input.provider.as_deref() == Some("builtin") {
-        crate::ai::local_model::run_text_simple(&prompt)
+        let r = crate::ai::local_model::run_text_simple(&prompt)?;
+        log::info!("本地模型返回 {} 字符: {}", r.len(), safe_truncate(&r, 200));
+        r
     } else {
-        crate::ai::call_ai_text(&input.api_url, &input.api_key, &input.model_name, &prompt).await
-    }?;
+        let r = ai::call_ai_text_with_system_and_tokens(
+            &input.api_url,
+            &input.api_key,
+            &input.model_name,
+            Some("你是一位梦境心理分析师。请根据数据生成月度情绪洞察，严格按照 JSON 格式输出，不要添加任何解释或 Markdown。"),
+            &prompt,
+            4096,
+        ).await?;
+        log::info!("远程模型返回 {} 字符: {}", r.len(), safe_truncate(&r, 200));
+        r
+    };
 
     let best_day = dreams.iter().max_by_key(|d| d.mood_score);
     let worst_day = dreams.iter().min_by_key(|d| d.mood_score);
+
+    fn mood_label(mood: Option<&String>) -> &str {
+        match mood.and_then(|m| Option::from(m.as_str())) {
+            Some("joy") => "喜悦",
+            Some("sadness") => "悲伤",
+            Some("fear") => "恐惧",
+            Some("anger") => "愤怒",
+            Some("surprise") => "惊讶",
+            Some("calm") => "平静",
+            Some(m) => m,
+            None => "无",
+        }
+    }
 
     let mut highlights = Vec::new();
     if let Some(d) = best_day {
@@ -836,7 +901,7 @@ pub async fn generate_monthly_insight(
             label: "最佳日".into(),
             date: d.dream_date[5..].to_string(),
             desc: format!("情绪分 {} 分，情绪为 {}", d.mood_score,
-                d.ai_mood.as_deref().unwrap_or("无")),
+                mood_label(d.ai_mood.as_ref())),
         });
     }
     if let Some(d) = worst_day {
@@ -844,21 +909,11 @@ pub async fn generate_monthly_insight(
             label: "低谷日".into(),
             date: d.dream_date[5..].to_string(),
             desc: format!("情绪分 {} 分，情绪为 {}", d.mood_score,
-                d.ai_mood.as_deref().unwrap_or("无")),
+                mood_label(d.ai_mood.as_ref())),
         });
     }
 
     let parsed = extract_insight_json(&result);
-
-    let emotion_shift = if let Some(shift) = parsed.get("emotion_shift") {
-        let mut map = std::collections::HashMap::new();
-        for key in ["fear", "joy", "sadness", "calm"].iter() {
-            map.insert(key.to_string(), shift[*key].as_i64().unwrap_or(0) as i32);
-        }
-        Some(map)
-    } else {
-        None
-    };
 
     let daily_scores: Vec<(String, i32)> = dreams.iter()
         .map(|d| (d.dream_date.clone(), d.mood_score))
@@ -866,27 +921,63 @@ pub async fn generate_monthly_insight(
 
     let prev_month_avg = get_prev_month_avg(&db, input.year, input.month);
 
-    let insight = MonthlyInsight {
-        year: input.year,
-        month: input.month,
-        total_dreams,
-        avg_mood_score: (avg_mood_score * 10.0).round() / 10.0,
-        avg_lucidity: (avg_lucidity * 10.0).round() / 10.0,
-        trend: parsed["trend"].as_str().unwrap_or("平稳").to_string(),
-        trend_value,
-        dominant_mood: parsed["dominant_mood"].as_str().unwrap_or(&top_mood).to_string(),
-        highlights,
-        themes: parsed["themes"].as_array().map(|a| {
-            a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
-        }).unwrap_or_default(),
-        insight_text: parsed["insight_text"].as_str().unwrap_or("").to_string(),
-        suggestion: parsed["suggestion"].as_str().unwrap_or("").to_string(),
-        emotion_shift,
-        lucidity_note: parsed["lucidity_note"].as_str().unwrap_or("").to_string(),
-        top_symbols,
-        top_tags,
-        daily_scores,
-        prev_month_avg,
+    let trend_str = if trend_value > 5 { "上升" } else if trend_value < -5 { "下降" } else { "平稳" };
+    let computed_themes: Vec<String> = top_symbols.iter().take(2).chain(top_tags.iter().take(2)).cloned().collect();
+
+    let insight = if let Some(ref parsed) = parsed {
+        let emotion_shift = if let Some(shift) = parsed.get("emotion_shift") {
+            let mut map = std::collections::HashMap::new();
+            for key in ["fear", "joy", "sadness", "calm"].iter() {
+                map.insert(key.to_string(), shift[*key].as_i64().unwrap_or(0) as i32);
+            }
+            Some(map)
+        } else {
+            None
+        };
+
+        MonthlyInsight {
+            year: input.year, month: input.month, total_dreams,
+            avg_mood_score: (avg_mood_score * 10.0).round() / 10.0,
+            avg_lucidity: (avg_lucidity * 10.0).round() / 10.0,
+            trend: parsed["trend"].as_str().unwrap_or(trend_str).to_string(),
+            trend_value,
+            dominant_mood: parsed["dominant_mood"].as_str().unwrap_or(&top_mood).to_string(),
+            highlights,
+            themes: parsed["themes"].as_array()
+                .map(|a| a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                .unwrap_or(computed_themes),
+            insight_text: parsed["insight_text"].as_str().unwrap_or("").to_string(),
+            suggestion: parsed["suggestion"].as_str().unwrap_or("").to_string(),
+            emotion_shift,
+            lucidity_note: parsed["lucidity_note"].as_str().unwrap_or("").to_string(),
+            top_symbols, top_tags, daily_scores, prev_month_avg,
+        }
+    } else {
+        let fallback_insight = format!(
+            "{}月共记录 {} 条梦境，平均情绪分 {:.1} 分，情绪趋势{}（{}分→{}分）。主导情绪为{}，平均清醒度 {:.1}/5。高频象征元素包括：{}。",
+            input.month, total_dreams,
+            (avg_mood_score * 10.0).round() / 10.0,
+            trend_str, first_score, last_score,
+            mood_label(Some(&top_mood)),
+            (avg_lucidity * 10.0).round() / 10.0,
+            top_symbols.iter().take(3).map(|s| s.as_str()).collect::<Vec<_>>().join("、"),
+        );
+
+        MonthlyInsight {
+            year: input.year, month: input.month, total_dreams,
+            avg_mood_score: (avg_mood_score * 10.0).round() / 10.0,
+            avg_lucidity: (avg_lucidity * 10.0).round() / 10.0,
+            trend: trend_str.to_string(),
+            trend_value,
+            dominant_mood: top_mood,
+            highlights,
+            themes: computed_themes,
+            insight_text: fallback_insight,
+            suggestion: String::new(),
+            emotion_shift: None,
+            lucidity_note: String::new(),
+            top_symbols, top_tags, daily_scores, prev_month_avg,
+        }
     };
 
     let ref_date = format!("{}-{:02}", input.year, input.month);
@@ -900,16 +991,14 @@ fn safe_truncate(s: &str, max_chars: usize) -> String {
     s.chars().take(max_chars).collect()
 }
 
-fn extract_insight_json(raw: &str) -> serde_json::Value {
+fn extract_insight_json(raw: &str) -> Option<serde_json::Value> {
     log::info!("尝试提取洞察 JSON，长度: {}", raw.len());
 
-    // 第1层：直接解析
     if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
         log::info!("洞察 JSON 直接解析成功");
-        return v;
+        return Some(v);
     }
 
-    // 第2层：从 Markdown 代码块提取
     for marker in &["```json", "```"] {
         if let Some(start) = raw.find(marker) {
             let prefix_len = marker.len();
@@ -922,14 +1011,13 @@ fn extract_insight_json(raw: &str) -> serde_json::Value {
                     let cleaned = raw[content_start..content_start + end].trim();
                     if let Ok(v) = serde_json::from_str::<serde_json::Value>(cleaned) {
                         log::info!("洞察 JSON Markdown 提取成功");
-                        return v;
+                        return Some(v);
                     }
                 }
             }
         }
     }
 
-    // 第3层：括号平衡提取
     if let Some(start) = raw.find('{') {
         let mut depth = 0i32;
         let mut in_string = false;
@@ -950,7 +1038,7 @@ fn extract_insight_json(raw: &str) -> serde_json::Value {
                         let candidate = String::from_utf8_lossy(&bytes[start..=i]);
                         if let Ok(v) = serde_json::from_str::<serde_json::Value>(&candidate) {
                             log::info!("洞察 JSON 括号平衡提取成功");
-                            return v;
+                            return Some(v);
                         }
                         break;
                     }
@@ -960,22 +1048,8 @@ fn extract_insight_json(raw: &str) -> serde_json::Value {
         }
     }
 
-    // 第4层：用原始文本作为 insight_text 的兜底
-    log::info!("洞察 JSON 解析全部失败，使用兜底");
-    let fallback_text = if raw.trim().is_empty() {
-        "AI 返回内容为空，请重试或切换模型。".to_string()
-    } else {
-        raw.chars().take(400).collect::<String>()
-    };
-    serde_json::json!({
-        "trend": "平稳",
-        "dominant_mood": "calm",
-        "themes": [],
-        "insight_text": fallback_text,
-        "suggestion": "",
-        "emotion_shift": null,
-        "lucidity_note": "",
-    })
+    log::info!("洞察 JSON 解析全部失败，返回 None");
+    None
 }
 
 fn get_last_month_comparison(db: &State<'_, Database>, year: i32, month: i32) -> String {

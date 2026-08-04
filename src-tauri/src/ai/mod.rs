@@ -23,6 +23,8 @@ pub struct AiEmotionResponse {
     pub symbols: Vec<Symbol>,
     pub insight: String,
     pub emotion_analysis: EmotionAnalysis,
+    #[serde(default)]
+    pub tags: Vec<String>,
 }
 
 pub fn parse_ai_response(raw_text: &str) -> Result<AiEmotionResponse, String> {
@@ -178,6 +180,9 @@ fn build_response_from_value(value: &serde_json::Value) -> AiEmotionResponse {
         symbols,
         insight,
         emotion_analysis,
+        tags: value["tags"].as_array().map_or_else(Vec::new, |arr| {
+            arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
+        }),
     }
 }
 
@@ -214,6 +219,8 @@ fn build_response_from_regex(text: &str) -> AiEmotionResponse {
         }
     }
 
+    let tags = extract_tags_array(text);
+
     AiEmotionResponse {
         summary,
         symbols,
@@ -223,7 +230,47 @@ fn build_response_from_regex(text: &str) -> AiEmotionResponse {
             mood_score,
             dimensions,
         },
+        tags,
     }
+}
+
+fn extract_tags_array(text: &str) -> Vec<String> {
+    let field_start = match text.find("\"tags\"") {
+        Some(p) => p,
+        None => return Vec::new(),
+    };
+    let rest = &text[field_start..];
+    let bracket = match rest.find('[') {
+        Some(p) => p,
+        None => return Vec::new(),
+    };
+    let arr_start = field_start + bracket;
+    let bytes = text.as_bytes();
+    let mut depth = 0i32;
+    let mut in_string = false;
+    let mut escape = false;
+    for (i, &b) in bytes.iter().enumerate().skip(arr_start) {
+        if escape { escape = false; continue; }
+        if in_string {
+            match b { b'"' => in_string = false, b'\\' => escape = true, _ => {} }
+            continue;
+        }
+        match b {
+            b'"' => in_string = true,
+            b'[' => depth += 1,
+            b']' => {
+                depth -= 1;
+                if depth == 0 {
+                    let json_str = String::from_utf8_lossy(&bytes[arr_start..=i]);
+                    return serde_json::from_str::<Vec<serde_json::Value>>(&json_str)
+                        .map(|arr| arr.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect())
+                        .unwrap_or_default();
+                }
+            }
+            _ => {}
+        }
+    }
+    Vec::new()
 }
 
 fn extract_str_field(text: &str, field: &str) -> Option<String> {
@@ -385,35 +432,64 @@ pub async fn call_ai(
 
 fn extract_text_from_response(body: &serde_json::Value) -> Result<&str, String> {
     if let Some(text) = body["choices"][0]["message"]["content"].as_str() {
-        return Ok(text);
+        if !text.is_empty() {
+            return Ok(text);
+        }
     }
     if let Some(text) = body["choices"][0]["text"].as_str() {
-        return Ok(text);
+        if !text.is_empty() {
+            return Ok(text);
+        }
+    }
+    // DeepSeek 等推理模型：reasoning_content 为空但 reasoning 有内容时兜底
+    if let Some(text) = body["choices"][0]["message"]["reasoning_content"].as_str() {
+        if !text.is_empty() {
+            log::info!("提取 reasoning_content 兜底");
+            return Ok(text);
+        }
     }
     if let Some(text) = body["message"]["content"].as_str() {
-        return Ok(text);
+        if !text.is_empty() {
+            return Ok(text);
+        }
     }
     if let Some(text) = body["response"].as_str() {
-        return Ok(text);
+        if !text.is_empty() {
+            return Ok(text);
+        }
     }
     if let Some(text) = body["output"].as_str() {
-        return Ok(text);
+        if !text.is_empty() {
+            return Ok(text);
+        }
     }
     if let Some(text) = body["content"].as_str() {
-        return Ok(text);
+        if !text.is_empty() {
+            return Ok(text);
+        }
     }
     if let Some(text) = body["text"].as_str() {
-        return Ok(text);
+        if !text.is_empty() {
+            return Ok(text);
+        }
     }
     if let Some(choices) = body["choices"].as_array() {
         if let Some(choice) = choices.first() {
             if let Some(text) = choice["delta"]["content"].as_str() {
-                return Ok(text);
+                if !text.is_empty() {
+                    return Ok(text);
+                }
             }
             if let Some(text) = choice["text"].as_str() {
-                return Ok(text);
+                if !text.is_empty() {
+                    return Ok(text);
+                }
             }
         }
+    }
+    // 最后尝试提取 content（即使是空字符串），让调用方兜底
+    if let Some(text) = body["choices"][0]["message"]["content"].as_str() {
+        return Ok(text);
     }
     Err(format!(
         "AI 返回内容为空。原始响应: {}",
@@ -427,11 +503,38 @@ pub async fn call_ai_text(
     model_name: &str,
     user_prompt: &str,
 ) -> Result<String, String> {
+    call_ai_text_with_system(api_url, api_key, model_name, None, user_prompt).await
+}
+
+pub async fn call_ai_text_with_system(
+    api_url: &str,
+    api_key: &str,
+    model_name: &str,
+    system_prompt: Option<&str>,
+    user_prompt: &str,
+) -> Result<String, String> {
+    call_ai_text_with_system_and_tokens(api_url, api_key, model_name, system_prompt, user_prompt, 1024).await
+}
+
+pub async fn call_ai_text_with_system_and_tokens(
+    api_url: &str,
+    api_key: &str,
+    model_name: &str,
+    system_prompt: Option<&str>,
+    user_prompt: &str,
+    max_tokens: usize,
+) -> Result<String, String> {
     let url = if api_url.ends_with("/chat/completions") {
         api_url.to_string()
     } else {
         format!("{}/chat/completions", api_url.trim_end_matches('/'))
     };
+
+    let mut messages = Vec::new();
+    if let Some(sys) = system_prompt {
+        messages.push(serde_json::json!({"role": "system", "content": sys}));
+    }
+    messages.push(serde_json::json!({"role": "user", "content": user_prompt}));
 
     let client = reqwest::Client::new();
     let response = client
@@ -440,9 +543,9 @@ pub async fn call_ai_text(
         .header("Authorization", format!("Bearer {}", api_key))
         .json(&serde_json::json!({
             "model": model_name,
-            "messages": [{"role": "user", "content": user_prompt}],
+            "messages": messages,
             "temperature": 0.8,
-            "max_tokens": 512
+            "max_tokens": 1024
         }))
         .send()
         .await
@@ -450,6 +553,8 @@ pub async fn call_ai_text(
 
     let status = response.status();
     let body: serde_json::Value = response.json().await.map_err(|e| format!("解析响应失败: {}", e))?;
+
+    log::info!("call_ai_text 原始返回: {}", serde_json::to_string_pretty(&body).unwrap_or_default());
 
     if !status.is_success() {
         let err_msg = body["error"]["message"]
@@ -460,6 +565,7 @@ pub async fn call_ai_text(
     }
 
     let text = extract_text_from_response(&body)?.to_string();
+    log::info!("call_ai_text 提取文本: {}", safe_truncate(&text, 200));
 
     Ok(text.trim().to_string())
 }

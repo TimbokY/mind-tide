@@ -142,13 +142,20 @@ pub fn load_model(model_path: &PathBuf) -> Result<(), String> {
 }
 
 pub fn run_inference(prompt: &str) -> Result<String, String> {
+    run_inference_with_params(prompt, 4096u32, 1024)
+}
+
+pub fn run_inference_with_params(
+    prompt: &str,
+    n_ctx: u32,
+    n_predict: usize,
+) -> Result<String, String> {
     let cell = LOCAL_MODEL
         .get()
         .ok_or("本地模型未加载，请先下载并加载模型")?;
     let mut guard = cell.lock().map_err(|e| e.to_string())?;
     let instance = guard.as_mut().ok_or("本地模型未加载")?;
 
-    let n_ctx = 4096u32;
     let ctx_params = LlamaContextParams::default()
         .with_n_ctx(NonZero::new(n_ctx));
 
@@ -163,6 +170,22 @@ pub fn run_inference(prompt: &str) -> Result<String, String> {
         .map_err(|e| format!("分词失败: {}", e))?;
 
     let n_tokens = tokens_list.len();
+    log::info!(
+        "推理: prompt 长度 {} 字符, {} tokens, n_ctx={}, n_predict={}",
+        prompt.len(),
+        n_tokens,
+        n_ctx,
+        n_predict,
+    );
+
+    if n_tokens > n_ctx as usize {
+        log::warn!(
+            "Prompt token 数 {} 超过上下文窗口 {}，可能被截断",
+            n_tokens,
+            n_ctx,
+        );
+    }
+
     let mut batch = LlamaBatch::new(n_tokens, 1);
 
     for (i, token) in tokens_list.iter().enumerate() {
@@ -179,7 +202,6 @@ pub fn run_inference(prompt: &str) -> Result<String, String> {
 
     let eos_token = instance.model.token_eos();
     let mut output = String::new();
-    let n_predict = 1024;
     let mut n_cur = batch.n_tokens();
 
     for _ in 0..n_predict {
@@ -206,6 +228,7 @@ pub fn run_inference(prompt: &str) -> Result<String, String> {
             .map_err(|e| format!("解码失败: {}", e))?;
     }
 
+    log::info!("推理完成: 输出 {} 字符", output.len());
     Ok(output)
 }
 
@@ -229,5 +252,5 @@ pub fn is_model_loaded() -> bool {
 }
 
 pub fn run_text_simple(prompt: &str) -> Result<String, String> {
-    run_inference(prompt)
+    run_inference_with_params(prompt, 4096u32, 2048)
 }

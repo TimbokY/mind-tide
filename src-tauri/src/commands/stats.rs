@@ -256,3 +256,45 @@ pub fn get_tag_frequencies(db: State<Database>) -> Result<Vec<TagFrequency>, Str
 
     Ok(results)
 }
+
+#[tauri::command]
+pub fn get_ai_symbol_frequencies(
+    db: State<Database>,
+    days: Option<i32>,
+) -> Result<Vec<TagFrequency>, String> {
+    let days = days.unwrap_or(30);
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+
+    let mut stmt = conn
+        .prepare(
+            "SELECT a.symbols FROM analyses a
+             JOIN dreams d ON d.id = a.dream_id
+             WHERE d.dream_date >= date('now', ?1 || ' days')
+             AND a.symbols IS NOT NULL AND a.symbols != '[]'",
+        )
+        .map_err(|e| e.to_string())?;
+
+    let days_param = format!("-{}", days);
+    let rows = stmt
+        .query_map([&days_param], |row| row.get::<_, String>(0))
+        .map_err(|e| e.to_string())?;
+
+    let mut counter: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+    for row in rows {
+        let json_str = row.map_err(|e| e.to_string())?;
+        if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(&json_str) {
+            for item in arr {
+                if let Some(elem) = item["element"].as_str() {
+                    *counter.entry(elem.to_string()).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+
+    let mut results: Vec<TagFrequency> = counter
+        .into_iter()
+        .map(|(tag, count)| TagFrequency { tag, count })
+        .collect();
+    results.sort_by(|a, b| b.count.cmp(&a.count));
+    Ok(results)
+}

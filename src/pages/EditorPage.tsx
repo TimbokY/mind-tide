@@ -54,6 +54,7 @@ interface AiResult {
   primary_mood: string
   mood_score: number
   emotions: string
+  tags: string[]
 }
 
 const moods = [
@@ -296,6 +297,22 @@ export default function EditorPage() {
                             {s.meaning}
                           </span>
                         </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {aiResult.tags.length > 0 && (
+                  <div>
+                    <Label className="text-xs text-[#94a3b8]">AI 生成标签</Label>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {aiResult.tags.map((tag, i) => (
+                        <span
+                          key={i}
+                          className="px-2 py-0.5 text-[11px] bg-[#8b5cf6]/10 text-[#a78bfa] rounded-md border border-[#8b5cf6]/20"
+                        >
+                          {tag}
+                        </span>
                       ))}
                     </div>
                   </div>

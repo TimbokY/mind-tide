@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { MoodTrendChart } from '@/components/charts/MoodTrendChart'
 import { EmotionRadar } from '@/components/charts/EmotionRadar'
 import { DreamHeatmap } from '@/components/charts/DreamHeatmap'
+import { WordCloud } from '@/components/charts/WordCloud'
 import { cn } from '@/lib/utils'
 import {
   Sparkles, Loader2, Lightbulb, RefreshCw,
@@ -104,12 +105,15 @@ export default function InsightsPage() {
     queryFn: () => invoke<TagFrequency[]>('get_tag_frequencies'),
   })
 
+  const { data: aiSymbols } = useQuery({
+    queryKey: ['aiSymbolFrequencies', timeRange],
+    queryFn: () => invoke<TagFrequency[]>('get_ai_symbol_frequencies', { days: timeRange }),
+  })
+
   const { data: aiConfig } = useQuery({
     queryKey: ['aiConfig'],
     queryFn: () => invoke<{ provider: string; model_name: string; api_url: string; api_key: string }>('get_ai_config'),
   })
-
-  const maxCount = tags ? Math.max(...tags.map((t) => t.count), 1) : 1
 
   const handleMonthlyInsight = async () => {
     if (!aiConfig?.model_name) return
@@ -361,23 +365,39 @@ export default function InsightsPage() {
       </div>
 
       <GlowCard className="p-5">
-        <h3 className="text-sm font-medium text-[#94a3b8] mb-4">近期梦境高频象征词</h3>
-        {tags && tags.length > 0 ? (
-          <div className="flex flex-wrap items-center justify-center gap-3 min-h-[120px]">
-            {tags.map((tag) => {
-              const size = 14 + (tag.count / maxCount) * 30
-              const opacity = 0.5 + (tag.count / maxCount) * 0.5
-              return (
-                <span key={tag.tag} className="text-[#8b5cf6] font-medium"
-                  style={{ fontSize: `${size}px`, opacity }}>
-                  {tag.tag}
-                </span>
-              )
-            })}
+        <h3 className="text-sm font-medium text-[#94a3b8] mb-4">梦境高频词云 · 标签 vs AI 象征</h3>
+        <div className="space-y-6">
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#8b5cf6]" />
+              <span className="text-[11px] text-[#64748b]">你的标签</span>
+            </div>
+            <div className="flex justify-center min-h-[220px] items-center bg-white/[0.01] rounded-xl">
+              <WordCloud
+                words={tags ?? []}
+                width={700}
+                height={220}
+                colorScheme="purple"
+                maxWords={20}
+              />
+            </div>
           </div>
-        ) : (
-          <div className="flex items-center justify-center h-[120px] text-[#64748b] text-sm">暂无标签</div>
-        )}
+          <div className="space-y-2">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-[#14b8a6]" />
+              <span className="text-[11px] text-[#64748b]">AI 象征元素</span>
+            </div>
+            <div className="flex justify-center min-h-[220px] items-center bg-white/[0.01] rounded-xl">
+              <WordCloud
+                words={aiSymbols ?? []}
+                width={700}
+                height={220}
+                colorScheme="teal"
+                maxWords={20}
+              />
+            </div>
+          </div>
+        </div>
       </GlowCard>
     </div>
   )

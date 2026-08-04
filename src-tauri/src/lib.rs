@@ -49,6 +49,7 @@ pub fn run() {
             commands::stats::get_dashboard_stats,
             commands::stats::get_dream_heatmap,
             commands::stats::get_tag_frequencies,
+            commands::stats::get_ai_symbol_frequencies,
             commands::settings::get_ai_config,
             commands::settings::save_ai_config,
             commands::settings::get_all_ai_configs,
