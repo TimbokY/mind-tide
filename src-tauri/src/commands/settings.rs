@@ -5,6 +5,7 @@ use crate::ai::local_model;
 use crate::db::Database;
 
 const CONFIG_KEY: &str = "ai_config";
+const ALL_CONFIGS_KEY: &str = "ai_configs_all";
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AiConfig {
@@ -67,6 +68,42 @@ pub fn save_ai_config(
     .map_err(|e| e.to_string())?;
 
     Ok(config)
+}
+
+#[tauri::command]
+pub fn get_all_ai_configs(
+    db: State<Database>,
+) -> Result<std::collections::HashMap<String, AiConfig>, String> {
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    let result = conn.query_row(
+        "SELECT value FROM settings WHERE key = ?1",
+        [ALL_CONFIGS_KEY],
+        |row| row.get::<_, String>(0),
+    );
+
+    match result {
+        Ok(json) => {
+            serde_json::from_str(&json).map_err(|e| format!("配置解析失败: {}", e))
+        }
+        Err(_) => Ok(std::collections::HashMap::new()),
+    }
+}
+
+#[tauri::command]
+pub fn save_all_ai_configs(
+    db: State<Database>,
+    configs: std::collections::HashMap<String, AiConfig>,
+) -> Result<(), String> {
+    let json = serde_json::to_string(&configs).map_err(|e| e.to_string())?;
+
+    let conn = db.conn.lock().map_err(|e| e.to_string())?;
+    conn.execute(
+        "INSERT OR REPLACE INTO settings (key, value) VALUES (?1, ?2)",
+        rusqlite::params![ALL_CONFIGS_KEY, json],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -156,13 +193,10 @@ pub async fn download_local_model(
         .map_err(|e| e.to_string())?
         .join("models");
 
-    let model = local_model::DownloadableModel {
-        name: String::new(),
-        display_name: String::new(),
-        size: String::new(),
-        url,
-        filename: filename.clone(),
-    };
+    let model = local_model::available_models()
+        .into_iter()
+        .find(|m| m.filename == filename)
+        .ok_or_else(|| format!("未知模型: {}", filename))?;
 
     let app_clone = app_handle.clone();
     let path = local_model::download_model(
@@ -230,6 +264,10 @@ pub fn ensure_model_loaded(
         Ok(()) => Ok(true),
         Err(e) => {
             log::warn!("自动加载模型失败: {}", e);
+            if e.contains("corrupted") || e.contains("incomplete") {
+                let _ = std::fs::remove_file(&model_path);
+                log::info!("已删除损坏的模型文件: {}", config.model_name);
+            }
             Ok(false)
         }
     }

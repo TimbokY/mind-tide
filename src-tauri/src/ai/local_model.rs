@@ -29,6 +29,7 @@ pub struct DownloadableModel {
     pub size: String,
     pub url: String,
     pub filename: String,
+    pub expected_bytes: u64,
 }
 
 pub fn available_models() -> Vec<DownloadableModel> {
@@ -39,6 +40,7 @@ pub fn available_models() -> Vec<DownloadableModel> {
             size: "~1 GB".into(),
             url: "https://huggingface.co/Qwen/Qwen2.5-1.5B-Instruct-GGUF/resolve/main/qwen2.5-1.5b-instruct-q4_k_m.gguf".into(),
             filename: "qwen2.5-1.5b-instruct-q4_k_m.gguf".into(),
+            expected_bytes: 986_000_000,
         },
         DownloadableModel {
             name: "qwen2.5-3b".into(),
@@ -46,6 +48,7 @@ pub fn available_models() -> Vec<DownloadableModel> {
             size: "~2 GB".into(),
             url: "https://huggingface.co/Qwen/Qwen2.5-3B-Instruct-GGUF/resolve/main/qwen2.5-3b-instruct-q4_k_m.gguf".into(),
             filename: "qwen2.5-3b-instruct-q4_k_m.gguf".into(),
+            expected_bytes: 2_147_000_000,
         },
         DownloadableModel {
             name: "qwen2.5-7b".into(),
@@ -53,6 +56,7 @@ pub fn available_models() -> Vec<DownloadableModel> {
             size: "~4.5 GB".into(),
             url: "https://huggingface.co/Qwen/Qwen2.5-7B-Instruct-GGUF/resolve/main/qwen2.5-7b-instruct-q4_k_m.gguf".into(),
             filename: "qwen2.5-7b-instruct-q4_k_m.gguf".into(),
+            expected_bytes: 4_700_000_000,
         },
     ]
 }
@@ -92,15 +96,37 @@ pub async fn download_model(
         on_progress(downloaded, total_size);
     }
 
+    let actual_size = std::fs::metadata(&file_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+    let expected = model.expected_bytes;
+    let tolerance = expected / 20; // 5% tolerance
+    if actual_size < expected - tolerance {
+        let _ = std::fs::remove_file(&file_path);
+        return Err(format!(
+            "下载不完整！文件大小 {} MB，预期约 {} MB。\n已删除不完整文件，请重新下载。",
+            actual_size / 1_000_000,
+            expected / 1_000_000,
+        ));
+    }
+    log::info!("模型下载完成: {} MB", actual_size / 1_000_000);
     Ok(file_path)
 }
 
 pub fn load_model(model_path: &PathBuf) -> Result<(), String> {
+    let file_size = std::fs::metadata(model_path)
+        .map(|m| m.len())
+        .unwrap_or(0);
+    log::info!("加载模型: {:?}, 文件大小: {} bytes (CPU only)", model_path, file_size);
+
     let backend = LlamaBackend::init().map_err(|e| format!("初始化后端失败: {}", e))?;
 
-    let model_params = LlamaModelParams::default();
-    let model = LlamaModel::load_from_file(&backend, model_path, &model_params)
-        .map_err(|e| format!("加载模型失败: {}", e))?;
+    let model = LlamaModel::load_from_file(
+        &backend,
+        model_path,
+        &LlamaModelParams::default().with_n_gpu_layers(0),
+    )
+    .map_err(|e| format!("加载模型失败（{} MB）: {}", file_size / 1024 / 1024, e))?;
 
     let instance = LocalModel {
         model,
@@ -149,10 +175,7 @@ pub fn run_inference(prompt: &str) -> Result<String, String> {
     ctx.decode(&mut batch)
         .map_err(|e| format!("解码失败: {}", e))?;
 
-    let mut sampler = LlamaSampler::chain_simple([
-        LlamaSampler::temp(0.7),
-        LlamaSampler::top_p(0.9, 1),
-    ]);
+    let mut sampler = LlamaSampler::greedy();
 
     let eos_token = instance.model.token_eos();
     let mut output = String::new();
@@ -188,8 +211,13 @@ pub fn run_inference(prompt: &str) -> Result<String, String> {
 
 pub fn run_local_analysis(content: &str) -> Result<AiEmotionResponse, String> {
     let full_prompt = prompts::DREAM_ANALYSIS_PROMPT.replace("{content}", content);
-    let raw_output = run_inference(&full_prompt)?;
-    crate::ai::parse_ai_response(&raw_output)
+    match run_inference(&full_prompt) {
+        Ok(raw_output) => crate::ai::parse_ai_response(&raw_output),
+        Err(e) => {
+            log::warn!("本地模型推理失败: {}，使用兜底结果", e);
+            crate::ai::parse_ai_response("")
+        }
+    }
 }
 
 pub fn is_model_loaded() -> bool {

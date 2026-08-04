@@ -51,6 +51,8 @@ pub fn run() {
             commands::stats::get_tag_frequencies,
             commands::settings::get_ai_config,
             commands::settings::save_ai_config,
+            commands::settings::get_all_ai_configs,
+            commands::settings::save_all_ai_configs,
             commands::settings::fetch_ollama_models,
             commands::settings::get_available_local_models,
             commands::settings::check_local_model,

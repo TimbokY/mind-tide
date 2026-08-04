@@ -280,6 +280,9 @@ pub struct CalendarDream {
     pub lucidity: i32,
     pub tags: Option<String>,
     pub dream_date: String,
+    pub summary: Option<String>,
+    pub symbols: Option<String>,
+    pub insight: Option<String>,
 }
 
 #[tauri::command]
@@ -299,10 +302,13 @@ pub fn get_dreams_by_month(
 
     let mut stmt = conn
         .prepare(
-            "SELECT id, title, content, mood_score, ai_mood, user_mood, lucidity, tags, dream_date
-             FROM dreams
-             WHERE dream_date >= ?1 AND dream_date < ?2
-             ORDER BY dream_date ASC",
+            "SELECT d.id, d.title, d.content, d.mood_score, d.ai_mood, d.user_mood,
+                    d.lucidity, d.tags, d.dream_date,
+                    a.summary, a.symbols, a.insight
+             FROM dreams d
+             LEFT JOIN analyses a ON a.dream_id = d.id
+             WHERE d.dream_date >= ?1 AND d.dream_date < ?2
+             ORDER BY d.dream_date ASC",
         )
         .map_err(|e| e.to_string())?;
 
@@ -318,6 +324,9 @@ pub fn get_dreams_by_month(
                 lucidity: row.get(6)?,
                 tags: row.get(7)?,
                 dream_date: row.get(8)?,
+                summary: row.get(9)?,
+                symbols: row.get(10)?,
+                insight: row.get(11)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -589,11 +598,40 @@ pub struct InsightInput {
     pub provider: Option<String>,
 }
 
+#[derive(Debug, Serialize, Clone)]
+pub struct HighlightDay {
+    pub label: String,
+    pub date: String,
+    pub desc: String,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct MonthlyInsight {
+    pub year: i32,
+    pub month: i32,
+    pub total_dreams: i32,
+    pub avg_mood_score: f64,
+    pub avg_lucidity: f64,
+    pub trend: String,
+    pub trend_value: i32,
+    pub dominant_mood: String,
+    pub highlights: Vec<HighlightDay>,
+    pub themes: Vec<String>,
+    pub insight_text: String,
+    pub suggestion: String,
+    pub emotion_shift: Option<std::collections::HashMap<String, i32>>,
+    pub lucidity_note: String,
+    pub top_symbols: Vec<String>,
+    pub top_tags: Vec<String>,
+    pub daily_scores: Vec<(String, i32)>,
+    pub prev_month_avg: Option<f64>,
+}
+
 #[tauri::command]
 pub async fn generate_monthly_insight(
     db: State<'_, Database>,
     input: InsightInput,
-) -> Result<String, String> {
+) -> Result<MonthlyInsight, String> {
     let start = format!("{}-{:02}-01", input.year, input.month);
     let end = if input.month == 12 {
         format!("{}-01-01", input.year + 1)
@@ -601,14 +639,46 @@ pub async fn generate_monthly_insight(
         format!("{}-{:02}-01", input.year, input.month + 1)
     };
 
-    let dreams: Vec<(String, i32)> = {
+    #[derive(Debug)]
+    struct DreamRow {
+        title: String,
+        dream_date: String,
+        mood_score: i32,
+        ai_mood: Option<String>,
+        lucidity: i32,
+        emotions: Option<String>,
+        summary: Option<String>,
+        symbols: Option<String>,
+        insight: Option<String>,
+        tags: Option<String>,
+    }
+
+    let dreams: Vec<DreamRow> = {
         let conn = db.conn.lock().map_err(|e| e.to_string())?;
         let mut stmt = conn
-            .prepare("SELECT title, mood_score FROM dreams WHERE dream_date >= ?1 AND dream_date < ?2 ORDER BY dream_date")
+            .prepare(
+                "SELECT d.title, d.dream_date, d.mood_score, d.ai_mood, d.lucidity,
+                        d.emotions, a.summary, a.symbols, a.insight, d.tags
+                 FROM dreams d
+                 LEFT JOIN analyses a ON a.dream_id = d.id
+                 WHERE d.dream_date >= ?1 AND d.dream_date < ?2
+                 ORDER BY d.dream_date ASC",
+            )
             .map_err(|e| e.to_string())?;
         let rows = stmt
-            .query_map(rusqlite::params![start, end], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
+            .query_map(rusqlite::params![&start, &end], |row| {
+                Ok(DreamRow {
+                    title: row.get(0)?,
+                    dream_date: row.get(1)?,
+                    mood_score: row.get(2)?,
+                    ai_mood: row.get(3)?,
+                    lucidity: row.get(4)?,
+                    emotions: row.get(5)?,
+                    summary: row.get(6)?,
+                    symbols: row.get(7)?,
+                    insight: row.get(8)?,
+                    tags: row.get(9)?,
+                })
             })
             .map_err(|e| e.to_string())?;
         let mut results = Vec::new();
@@ -622,18 +692,134 @@ pub async fn generate_monthly_insight(
         return Err("该月暂无梦境记录".into());
     }
 
+    let total_dreams = dreams.len() as i32;
+    let avg_mood_score = dreams.iter().map(|d| d.mood_score as f64).sum::<f64>() / total_dreams as f64;
+    let avg_lucidity = dreams.iter().map(|d| d.lucidity as f64).sum::<f64>() / total_dreams as f64;
+
+    let first_score = dreams.first().map(|d| d.mood_score).unwrap_or(0);
+    let last_score = dreams.last().map(|d| d.mood_score).unwrap_or(0);
+    let trend_value = last_score - first_score;
+
+    let mut mood_counts: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+    for d in &dreams {
+        if let Some(ref m) = d.ai_mood {
+            *mood_counts.entry(m.clone()).or_insert(0) += 1;
+        }
+    }
+    let top_mood = mood_counts.iter()
+        .max_by_key(|&(_, v)| v)
+        .map(|(k, _)| k.clone())
+        .unwrap_or_else(|| "calm".into());
+
+    let mut symbol_counts: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+    for d in &dreams {
+        if let Some(ref s) = d.symbols {
+            if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(s) {
+                for item in &arr {
+                    if let Some(e) = item["element"].as_str() {
+                        *symbol_counts.entry(e.to_string()).or_insert(0) += 1;
+                    }
+                }
+            }
+        }
+    }
+    let mut top_symbols: Vec<String> = {
+        let mut pairs: Vec<_> = symbol_counts.into_iter().collect();
+        pairs.sort_by(|a, b| b.1.cmp(&a.1));
+        pairs.into_iter().map(|(k, _)| k).take(5).collect()
+    };
+
+    let mut tag_counts: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+    for d in &dreams {
+        if let Some(ref t) = d.tags {
+            if let Ok(tags) = serde_json::from_str::<Vec<String>>(t) {
+                for tag in tags {
+                    *tag_counts.entry(tag).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+    let mut top_tags: Vec<String> = {
+        let mut pairs: Vec<_> = tag_counts.into_iter().collect();
+        pairs.sort_by(|a, b| b.1.cmp(&a.1));
+        pairs.into_iter().map(|(k, _)| k).take(5).collect()
+    };
+
+    let mut fear_sum = 0f64;
+    let mut joy_sum = 0f64;
+    let mut sadness_sum = 0f64;
+    let mut calm_sum = 0f64;
+    let mut emo_count = 0;
+    for d in &dreams {
+        if let Some(ref e) = d.emotions {
+            if let Ok(dims) = serde_json::from_str::<serde_json::Value>(e) {
+                fear_sum += dims["fear"].as_f64().unwrap_or(0.0);
+                joy_sum += dims["joy"].as_f64().unwrap_or(0.0);
+                sadness_sum += dims["sadness"].as_f64().unwrap_or(0.0);
+                calm_sum += dims["calm"].as_f64().unwrap_or(0.0);
+                emo_count += 1;
+            }
+        }
+    }
+    let (fear_avg, joy_avg, sadness_avg, calm_avg) = if emo_count > 0 {
+        (
+            (fear_sum / emo_count as f64).round() as i32,
+            (joy_sum / emo_count as f64).round() as i32,
+            (sadness_sum / emo_count as f64).round() as i32,
+            (calm_sum / emo_count as f64).round() as i32,
+        )
+    } else {
+        (20, 30, 10, 40)
+    };
+
     let dream_list = dreams
         .iter()
         .enumerate()
-        .map(|(i, (title, score))| format!("{}. {} (情绪分: {})", i + 1, title, score))
+        .map(|(i, d)| {
+            let mut line = format!(
+                "{}. {}（日期:{} 情绪分:{} 情绪:{} 清醒度:{}）",
+                i + 1, d.title, d.dream_date, d.mood_score,
+                d.ai_mood.as_deref().unwrap_or("无"),
+                d.lucidity,
+            );
+            if let Some(ref s) = d.summary {
+                line.push_str(&format!("\n   摘要: {}", s));
+            }
+            if let Some(ref s) = d.symbols {
+                if let Ok(arr) = serde_json::from_str::<Vec<serde_json::Value>>(s) {
+                    let elements: Vec<&str> = arr.iter()
+                        .filter_map(|v| v["element"].as_str())
+                        .collect();
+                    if !elements.is_empty() {
+                        line.push_str(&format!("\n   象征: {}", elements.join(", ")));
+                    }
+                }
+            }
+            if let Some(ref s) = d.insight {
+                line.push_str(&format!("\n   洞察: {}", s));
+            }
+            line
+        })
         .collect::<Vec<_>>()
-        .join("\n");
+        .join("\n\n");
+
+    let last_month_comparison = get_last_month_comparison(&db, input.year, input.month);
 
     let prompt = crate::ai::prompts::MONTHLY_INSIGHT_PROMPT
         .replace("{year}", &input.year.to_string())
         .replace("{month}", &input.month.to_string())
-        .replace("{count}", &dreams.len().to_string())
-        .replace("{dream_list}", &dream_list);
+        .replace("{count}", &total_dreams.to_string())
+        .replace("{dream_list}", &dream_list)
+        .replace("{avg_score}", &format!("{:.1}", avg_mood_score))
+        .replace("{avg_lucidity}", &format!("{:.1}", avg_lucidity))
+        .replace("{top_mood}", &top_mood)
+        .replace("{top_symbols}", &top_symbols.join(", "))
+        .replace("{top_tags}", &top_tags.join(", "))
+        .replace("{fear_avg}", &fear_avg.to_string())
+        .replace("{joy_avg}", &joy_avg.to_string())
+        .replace("{sadness_avg}", &sadness_avg.to_string())
+        .replace("{calm_avg}", &calm_avg.to_string())
+        .replace("{last_month_comparison}", &last_month_comparison);
 
     let result = if input.provider.as_deref() == Some("builtin") {
         crate::ai::local_model::run_text_simple(&prompt)
@@ -641,10 +827,239 @@ pub async fn generate_monthly_insight(
         crate::ai::call_ai_text(&input.api_url, &input.api_key, &input.model_name, &prompt).await
     }?;
 
-    let ref_date = format!("{}-{:02}", input.year, input.month);
-    let _ = save_summary_internal(&db, "monthly", &ref_date, &result);
+    let best_day = dreams.iter().max_by_key(|d| d.mood_score);
+    let worst_day = dreams.iter().min_by_key(|d| d.mood_score);
 
-    Ok(result)
+    let mut highlights = Vec::new();
+    if let Some(d) = best_day {
+        highlights.push(HighlightDay {
+            label: "最佳日".into(),
+            date: d.dream_date[5..].to_string(),
+            desc: format!("情绪分 {} 分，情绪为 {}", d.mood_score,
+                d.ai_mood.as_deref().unwrap_or("无")),
+        });
+    }
+    if let Some(d) = worst_day {
+        highlights.push(HighlightDay {
+            label: "低谷日".into(),
+            date: d.dream_date[5..].to_string(),
+            desc: format!("情绪分 {} 分，情绪为 {}", d.mood_score,
+                d.ai_mood.as_deref().unwrap_or("无")),
+        });
+    }
+
+    let parsed = extract_insight_json(&result);
+
+    let emotion_shift = if let Some(shift) = parsed.get("emotion_shift") {
+        let mut map = std::collections::HashMap::new();
+        for key in ["fear", "joy", "sadness", "calm"].iter() {
+            map.insert(key.to_string(), shift[*key].as_i64().unwrap_or(0) as i32);
+        }
+        Some(map)
+    } else {
+        None
+    };
+
+    let daily_scores: Vec<(String, i32)> = dreams.iter()
+        .map(|d| (d.dream_date.clone(), d.mood_score))
+        .collect();
+
+    let prev_month_avg = get_prev_month_avg(&db, input.year, input.month);
+
+    let insight = MonthlyInsight {
+        year: input.year,
+        month: input.month,
+        total_dreams,
+        avg_mood_score: (avg_mood_score * 10.0).round() / 10.0,
+        avg_lucidity: (avg_lucidity * 10.0).round() / 10.0,
+        trend: parsed["trend"].as_str().unwrap_or("平稳").to_string(),
+        trend_value,
+        dominant_mood: parsed["dominant_mood"].as_str().unwrap_or(&top_mood).to_string(),
+        highlights,
+        themes: parsed["themes"].as_array().map(|a| {
+            a.iter().filter_map(|v| v.as_str().map(|s| s.to_string())).collect()
+        }).unwrap_or_default(),
+        insight_text: parsed["insight_text"].as_str().unwrap_or("").to_string(),
+        suggestion: parsed["suggestion"].as_str().unwrap_or("").to_string(),
+        emotion_shift,
+        lucidity_note: parsed["lucidity_note"].as_str().unwrap_or("").to_string(),
+        top_symbols,
+        top_tags,
+        daily_scores,
+        prev_month_avg,
+    };
+
+    let ref_date = format!("{}-{:02}", input.year, input.month);
+    let json_str = serde_json::to_string(&insight).map_err(|e| e.to_string())?;
+    let _ = save_summary_internal(&db, "monthly", &ref_date, &json_str);
+
+    Ok(insight)
+}
+
+fn safe_truncate(s: &str, max_chars: usize) -> String {
+    s.chars().take(max_chars).collect()
+}
+
+fn extract_insight_json(raw: &str) -> serde_json::Value {
+    log::info!("尝试提取洞察 JSON，长度: {}", raw.len());
+
+    // 第1层：直接解析
+    if let Ok(v) = serde_json::from_str::<serde_json::Value>(raw) {
+        log::info!("洞察 JSON 直接解析成功");
+        return v;
+    }
+
+    // 第2层：从 Markdown 代码块提取
+    for marker in &["```json", "```"] {
+        if let Some(start) = raw.find(marker) {
+            let prefix_len = marker.len();
+            let content_start = raw[start + prefix_len..]
+                .find('\n')
+                .map(|n| start + prefix_len + n + 1)
+                .unwrap_or(start + prefix_len);
+            for end_marker in &["\n```", "```"] {
+                if let Some(end) = raw[content_start..].find(end_marker) {
+                    let cleaned = raw[content_start..content_start + end].trim();
+                    if let Ok(v) = serde_json::from_str::<serde_json::Value>(cleaned) {
+                        log::info!("洞察 JSON Markdown 提取成功");
+                        return v;
+                    }
+                }
+            }
+        }
+    }
+
+    // 第3层：括号平衡提取
+    if let Some(start) = raw.find('{') {
+        let mut depth = 0i32;
+        let mut in_string = false;
+        let mut escape = false;
+        let bytes = raw.as_bytes();
+        for (i, &b) in bytes.iter().enumerate().skip(start) {
+            if escape { escape = false; continue; }
+            if in_string {
+                match b { b'"' => in_string = false, b'\\' => escape = true, _ => {} }
+                continue;
+            }
+            match b {
+                b'"' => in_string = true,
+                b'{' => depth += 1,
+                b'}' => {
+                    depth -= 1;
+                    if depth == 0 {
+                        let candidate = String::from_utf8_lossy(&bytes[start..=i]);
+                        if let Ok(v) = serde_json::from_str::<serde_json::Value>(&candidate) {
+                            log::info!("洞察 JSON 括号平衡提取成功");
+                            return v;
+                        }
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // 第4层：用原始文本作为 insight_text 的兜底
+    log::info!("洞察 JSON 解析全部失败，使用兜底");
+    let fallback_text = if raw.trim().is_empty() {
+        "AI 返回内容为空，请重试或切换模型。".to_string()
+    } else {
+        raw.chars().take(400).collect::<String>()
+    };
+    serde_json::json!({
+        "trend": "平稳",
+        "dominant_mood": "calm",
+        "themes": [],
+        "insight_text": fallback_text,
+        "suggestion": "",
+        "emotion_shift": null,
+        "lucidity_note": "",
+    })
+}
+
+fn get_last_month_comparison(db: &State<'_, Database>, year: i32, month: i32) -> String {
+    let (prev_year, prev_month) = if month == 1 {
+        (year - 1, 12)
+    } else {
+        (year, month - 1)
+    };
+    let prev_start = format!("{}-{:02}-01", prev_year, prev_month);
+    let prev_end = if prev_month == 12 {
+        format!("{}-01-01", prev_year + 1)
+    } else {
+        format!("{}-{:02}-01", prev_year, prev_month + 1)
+    };
+
+    let conn = match db.conn.lock() { Ok(c) => c, Err(_) => return "无上月数据".into() };
+    let mut stmt = match conn.prepare(
+        "SELECT COUNT(*), COALESCE(AVG(mood_score), 50), COALESCE(AVG(lucidity), 0)
+         FROM dreams WHERE dream_date >= ?1 AND dream_date < ?2",
+    ) {
+        Ok(s) => s,
+        Err(_) => return "无上月数据".into(),
+    };
+
+    let (count, avg_score, avg_lucidity): (i32, f64, f64) = match stmt.query_row(
+        rusqlite::params![&prev_start, &prev_end],
+        |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+    ) {
+        Ok(r) => r,
+        Err(_) => return "无上月数据".into(),
+    };
+
+    if count == 0 {
+        return format!("上月（{}年{}月）无梦境记录，无法对比。", prev_year, prev_month);
+    }
+
+    let mut emo_counts: std::collections::HashMap<String, i32> = std::collections::HashMap::new();
+    if let Ok(mut s) = conn.prepare(
+        "SELECT ai_mood FROM dreams WHERE dream_date >= ?1 AND dream_date < ?2 AND ai_mood IS NOT NULL",
+    ) {
+        if let Ok(rows) = s.query_map(rusqlite::params![&prev_start, &prev_end], |row| row.get::<_, String>(0)) {
+            for row in rows {
+                if let Ok(mood) = row {
+                    *emo_counts.entry(mood).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+    let prev_top_mood = emo_counts.iter()
+        .max_by_key(|&(_, v)| v)
+        .map(|(k, _)| k.clone())
+        .unwrap_or_else(|| "calm".into());
+
+    format!(
+        "上月（{}年{}月）共 {} 条梦境，平均情绪分 {:.1}，平均清醒度 {:.1}，主导情绪 {}",
+        prev_year, prev_month, count,
+        (avg_score * 10.0).round() / 10.0,
+        (avg_lucidity * 10.0).round() / 10.0,
+        prev_top_mood,
+    )
+}
+
+fn get_prev_month_avg(db: &State<'_, Database>, year: i32, month: i32) -> Option<f64> {
+    let (prev_year, prev_month) = if month == 1 {
+        (year - 1, 12)
+    } else {
+        (year, month - 1)
+    };
+    let prev_start = format!("{}-{:02}-01", prev_year, prev_month);
+    let prev_end = if prev_month == 12 {
+        format!("{}-01-01", prev_year + 1)
+    } else {
+        format!("{}-{:02}-01", prev_year, prev_month + 1)
+    };
+
+    let conn = db.conn.lock().ok()?;
+    let (count, avg_score): (i32, f64) = conn
+        .query_row(
+            "SELECT COUNT(*), COALESCE(AVG(mood_score), 50) FROM dreams WHERE dream_date >= ?1 AND dream_date < ?2",
+            rusqlite::params![&prev_start, &prev_end],
+            |row| Ok((row.get(0)?, row.get(1)?)),
+        )
+        .ok()?;
+    if count == 0 { None } else { Some((avg_score * 10.0).round() / 10.0) }
 }
 
 #[tauri::command]
