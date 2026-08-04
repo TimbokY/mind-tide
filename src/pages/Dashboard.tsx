@@ -53,6 +53,7 @@ export default function Dashboard() {
       return true
     },
     enabled: !!aiConfig,
+    refetchInterval: 10000,
   })
 
   const { data: todaySummary, refetch: refetchToday, isRefetching: todayRefetching } = useQuery({

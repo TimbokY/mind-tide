@@ -96,6 +96,7 @@ export default function SettingsPage() {
   const [clearConfirmText, setClearConfirmText] = useState('')
   const [clearing, setClearing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const providerCache = useRef<Record<string, AiConfig>>({})
 
   useEffect(() => {
     loadConfig()
@@ -124,6 +125,10 @@ export default function SettingsPage() {
     try {
       const loaded = await invoke<AiConfig>('get_ai_config')
       setConfig(loaded)
+      const allConfigs = await invoke<Record<string, AiConfig>>('get_all_ai_configs')
+      for (const [key, value] of Object.entries(allConfigs)) {
+        providerCache.current[key] = value
+      }
     } catch {
       // 默认值
     } finally {
@@ -167,6 +172,8 @@ export default function SettingsPage() {
     setSaved(false)
     try {
       await invoke('save_ai_config', { config })
+      providerCache.current[config.provider] = { ...config }
+      await invoke('save_all_ai_configs', { configs: providerCache.current })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (e) {
@@ -208,10 +215,9 @@ export default function SettingsPage() {
         if (!config.model_name) {
           setTestResult('fail')
         } else {
-          const exists = await invoke<boolean>('check_local_model', {
-            filename: config.model_name,
-          })
-          setTestResult(exists ? 'ok' : 'fail')
+          await invoke<boolean>('ensure_model_loaded')
+          const loaded = await invoke<boolean>('is_local_model_loaded')
+          setTestResult(loaded ? 'ok' : 'fail')
         }
       } else {
         setTestResult('ok')
@@ -235,7 +241,9 @@ export default function SettingsPage() {
       await invoke('load_local_model', { filename: model.filename })
       setModelLoaded(true)
     } catch (e) {
-      console.error('下载或加载失败:', e)
+      setModelExists((prev) => ({ ...prev, [model.filename]: false }))
+      setImportMessage(`下载失败: ${String(e)}`)
+      setTimeout(() => setImportMessage(null), 6000)
     } finally {
       setDownloading(null)
       setDownloadProgress(null)
@@ -312,16 +320,21 @@ export default function SettingsPage() {
   }
 
   const handleProviderChange = (provider: string) => {
-    const preset = PRESETS[provider]
-    const newConfig: AiConfig = {
-      provider,
-      api_url: preset.url ?? '',
-      api_key: preset.key ?? '',
-      model_name: provider === 'builtin'
-        ? 'qwen2.5-1.5b-instruct-q4_k_m.gguf'
-        : '',
+    providerCache.current[config.provider] = { ...config }
+    const cached = providerCache.current[provider]
+    if (cached) {
+      setConfig(cached)
+    } else {
+      const preset = PRESETS[provider]
+      setConfig({
+        provider,
+        api_url: preset.url ?? '',
+        api_key: preset.key ?? '',
+        model_name: provider === 'builtin'
+          ? 'qwen2.5-1.5b-instruct-q4_k_m.gguf'
+          : '',
+      })
     }
-    setConfig(newConfig)
     setOllamaModels([])
     setModelFetchError(null)
     setTestResult('idle')

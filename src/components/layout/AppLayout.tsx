@@ -1,11 +1,23 @@
+import { useEffect } from 'react'
 import { Outlet, useLocation } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { AnimatePresence } from 'framer-motion'
 import { Sidebar } from './Sidebar'
 import { PageTransition } from './page-transition'
 import { AuroraBackground } from '@/components/ui/aurora-background'
+import { invoke } from '@/lib/tauri'
 
 export function AppLayout() {
   const location = useLocation()
+  const queryClient = useQueryClient()
+
+  useEffect(() => {
+    invoke<boolean>('ensure_model_loaded')
+      .then(() => {
+        queryClient.invalidateQueries({ queryKey: ['aiReady'] })
+      })
+      .catch(() => {})
+  }, [])
 
   return (
     <div className="min-h-screen bg-[#0f172a] text-[#f8fafc] font-sans relative">

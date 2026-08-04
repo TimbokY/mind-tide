@@ -18,6 +18,8 @@ import {
   ChevronUp,
   Settings,
   BarChart3,
+  AlertTriangle,
+  X,
 } from 'lucide-react'
 import { invoke } from '@/lib/tauri'
 import { cn } from '@/lib/utils'
@@ -88,6 +90,7 @@ export default function EditorPage() {
   const [aiResult, setAiResult] = useState<AiResult | null>(null)
   const [aiExpanded, setAiExpanded] = useState(false)
   const [aiConfig, setAiConfig] = useState<AiConfig | null>(null)
+  const [aiError, setAiError] = useState<string | null>(null)
 
   useEffect(() => {
     invoke<AiConfig>('get_ai_config')
@@ -145,6 +148,7 @@ export default function EditorPage() {
 
     setSaving(true)
     setSaved(false)
+    setAiError(null)
 
     try {
       const result = await invoke<DreamResponse>('save_dream', {
@@ -185,6 +189,9 @@ export default function EditorPage() {
       queryClient.invalidateQueries({ queryKey: ['todaySummary'] })
     } catch (error) {
       console.error('操作失败:', error)
+      const msg = typeof error === 'string' ? error : '操作失败，请重试'
+      setAiError(msg)
+      setTimeout(() => setAiError(null), 8000)
     } finally {
       setSaving(false)
       setAnalyzing(false)
@@ -332,6 +339,21 @@ export default function EditorPage() {
               </div>
             )}
           </Card>
+        )}
+
+        {aiError && (
+          <div className="flex items-start gap-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+            <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-red-300 break-words">{aiError}</p>
+            </div>
+            <button
+              onClick={() => setAiError(null)}
+              className="text-red-400 hover:text-red-300 shrink-0"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         )}
 
         <div className="flex items-center gap-3">

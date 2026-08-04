@@ -131,7 +131,7 @@ export function Sidebar() {
           )} />
         </NavLink>
         <p className="text-[10px] text-[#64748b]/50 px-3">
-          Track your dreams, visualize your mind.
+          记录梦境起伏，看见潜意识潮汐
         </p>
       </div>
     </motion.aside>

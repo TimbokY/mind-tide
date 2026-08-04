@@ -20,6 +20,9 @@ interface CalendarDream {
   lucidity: number
   tags: string | null
   dream_date: string
+  summary: string | null
+  symbols: string | null
+  insight: string | null
 }
 
 interface DayGroup {
@@ -42,6 +45,7 @@ export default function CalendarPage() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [highlightDate, setHighlightDate] = useState<string | null>(null)
   const [analyzingId, setAnalyzingId] = useState<string | null>(null)
+  const [analyzeError, setAnalyzeError] = useState<string | null>(null)
   const queryClient = useQueryClient()
   const dateRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
@@ -130,6 +134,7 @@ export default function CalendarPage() {
 
   const handleReAnalyze = useCallback(async (dreamId: string) => {
     setAnalyzingId(dreamId)
+    setAnalyzeError(null)
     try {
       const config = await invoke<{provider: string; model_name: string; api_url: string; api_key: string}>('get_ai_config')
       if (!config.model_name) return
@@ -144,7 +149,12 @@ export default function CalendarPage() {
       queryClient.invalidateQueries({ queryKey: ['moodTrend'] })
       queryClient.invalidateQueries({ queryKey: ['emotionRadar'] })
       queryClient.invalidateQueries({ queryKey: ['tagFrequencies'] })
-    } catch (e) { console.error('重新解读失败:', e) }
+    } catch (e) {
+      console.error('重新解读失败:', e)
+      const msg = typeof e === 'string' ? e : '重新解读失败，请重试'
+      setAnalyzeError(msg)
+      setTimeout(() => setAnalyzeError(null), 8000)
+    }
     finally { setAnalyzingId(null) }
   }, [queryClient])
 
@@ -197,6 +207,21 @@ export default function CalendarPage() {
           )}
         </div>
       </div>
+
+      {analyzeError && (
+        <div className="flex items-start gap-3 p-3 rounded-xl bg-red-500/10 border border-red-500/20">
+          <span className="text-red-400 shrink-0 mt-0.5">⚠</span>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-red-300 break-words">{analyzeError}</p>
+          </div>
+          <button
+            onClick={() => setAnalyzeError(null)}
+            className="text-red-400 hover:text-red-300 shrink-0 text-lg leading-none"
+          >
+            ✕
+          </button>
+        </div>
+      )}
 
       {/* ==== 空状态 ==== */}
       {isEmpty && (

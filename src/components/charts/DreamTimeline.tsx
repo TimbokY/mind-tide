@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
-import { Smile, Frown, Meh, Trash2, ChevronDown, RefreshCw } from 'lucide-react'
+import { Smile, Frown, Meh, Trash2, ChevronDown, RefreshCw, Sparkles } from 'lucide-react'
 
 interface Dream {
   id: string
@@ -13,6 +13,9 @@ interface Dream {
   lucidity: number
   tags: string | null
   dream_date: string
+  summary: string | null
+  symbols: string | null
+  insight: string | null
 }
 
 interface DayGroup {
@@ -86,6 +89,8 @@ export function DreamTimeline({ groups, onDelete, onReAnalyze, analyzingId }: Dr
               const isDeleting = deletingIds.has(id)
               let tags: string[] = []
               try { if (dream.tags) tags = JSON.parse(dream.tags) } catch {}
+              let symbols: { element: string; meaning: string }[] = []
+              try { if (dream.symbols) symbols = JSON.parse(dream.symbols) } catch {}
 
               return (
                 <motion.div
@@ -172,6 +177,39 @@ export function DreamTimeline({ groups, onDelete, onReAnalyze, analyzingId }: Dr
                         <div className="px-5 py-3 text-sm text-[#94a3b8] leading-relaxed whitespace-pre-wrap bg-white/[0.01] rounded-b-xl border-t border-white/5">
                           {dream.content}
                         </div>
+
+                        {(dream.summary || dream.insight || symbols.length > 0) && (
+                          <div className="px-5 py-3 space-y-3 bg-[#8b5cf6]/[0.03] border-t border-[#8b5cf6]/10 rounded-b-xl">
+                            <div className="flex items-center gap-1.5">
+                              <Sparkles className="w-3 h-3 text-[#8b5cf6]" />
+                              <span className="text-[11px] text-[#8b5cf6] font-medium">AI 梦境解析</span>
+                            </div>
+
+                            {dream.summary && (
+                              <p className="text-xs text-[#f8fafc] leading-relaxed">{dream.summary}</p>
+                            )}
+
+                            {symbols.length > 0 && (
+                              <div className="flex flex-wrap gap-1.5">
+                                {symbols.map((s, i) => (
+                                  <span
+                                    key={i}
+                                    className="px-2 py-0.5 text-[10px] bg-[#8b5cf6]/10 border border-[#8b5cf6]/20 rounded-md"
+                                  >
+                                    <span className="text-[#c4b5fd]">{s.element}</span>
+                                    <span className="text-[#64748b] ml-1.5">{s.meaning}</span>
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+
+                            {dream.insight && (
+                              <p className="text-[11px] text-[#64748b] leading-relaxed italic">
+                                {dream.insight}
+                              </p>
+                            )}
+                          </div>
+                        )}
                       </motion.div>
                     )}
                   </AnimatePresence>
