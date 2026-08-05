@@ -97,7 +97,6 @@ export default function SettingsPage() {
   const [clearStep, setClearStep] = useState<'idle' | 'confirm' | 'typing'>('idle')
   const [clearConfirmText, setClearConfirmText] = useState('')
   const [clearing, setClearing] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const providerCache = useRef<Record<string, AiConfig>>({})
 
   useEffect(() => {
@@ -285,26 +284,29 @@ export default function SettingsPage() {
     }
   }
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click()
-  }
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
+  const handleImportClick = async () => {
     setImporting(true)
     setImportMessage(null)
     try {
-      const text = await file.text()
-      const msg = await invoke<string>('import_dreams', { json: text })
+      const msg = await invoke<string>('import_dreams_file')
       setImportMessage(msg)
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] })
+      queryClient.invalidateQueries({ queryKey: ['todaySummary'] })
+      queryClient.invalidateQueries({ queryKey: ['dreamsByMonth'] })
+      queryClient.invalidateQueries({ queryKey: ['moodTrend'] })
+      queryClient.invalidateQueries({ queryKey: ['emotionRadar'] })
+      queryClient.invalidateQueries({ queryKey: ['dreamHeatmap'] })
+      queryClient.invalidateQueries({ queryKey: ['tagFrequencies'] })
+      queryClient.invalidateQueries({ queryKey: ['aiSymbolFrequencies'] })
+      queryClient.invalidateQueries({ queryKey: ['monthlyInsight'] })
       setTimeout(() => setImportMessage(null), 4000)
     } catch (e) {
-      setImportMessage(String(e))
-      setTimeout(() => setImportMessage(null), 4000)
+      if (String(e) !== '已取消导入') {
+        setImportMessage(`导入失败: ${String(e)}`)
+        setTimeout(() => setImportMessage(null), 4000)
+      }
     } finally {
       setImporting(false)
-      if (fileInputRef.current) fileInputRef.current.value = ''
     }
   }
 
@@ -315,6 +317,15 @@ export default function SettingsPage() {
       setClearStep('idle')
       setClearConfirmText('')
       setImportMessage(msg)
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] })
+      queryClient.invalidateQueries({ queryKey: ['todaySummary'] })
+      queryClient.invalidateQueries({ queryKey: ['dreamsByMonth'] })
+      queryClient.invalidateQueries({ queryKey: ['moodTrend'] })
+      queryClient.invalidateQueries({ queryKey: ['emotionRadar'] })
+      queryClient.invalidateQueries({ queryKey: ['dreamHeatmap'] })
+      queryClient.invalidateQueries({ queryKey: ['tagFrequencies'] })
+      queryClient.invalidateQueries({ queryKey: ['aiSymbolFrequencies'] })
+      queryClient.invalidateQueries({ queryKey: ['monthlyInsight'] })
       setTimeout(() => setImportMessage(null), 4000)
     } catch (e) {
       setImportMessage(String(e))
@@ -710,13 +721,6 @@ export default function SettingsPage() {
             )}
             导入梦境
           </Button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            className="hidden"
-            onChange={handleFileChange}
-          />
         </div>
 
         {importMessage && (

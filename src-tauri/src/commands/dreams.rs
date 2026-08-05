@@ -431,6 +431,7 @@ pub async fn export_dreams_file(app_handle: AppHandle, db: State<'_, Database>) 
     let path = app_handle
         .dialog()
         .file()
+        .set_title("导出梦境记录")
         .add_filter("JSON 文件", &["json"])
         .set_file_name(&default_name)
         .blocking_save_file();
@@ -443,6 +444,52 @@ pub async fn export_dreams_file(app_handle: AppHandle, db: State<'_, Database>) 
             Ok(format!("已导出到 {}", path.display()))
         }
         None => Err("已取消导出".into()),
+    }
+}
+
+#[tauri::command]
+pub async fn import_dreams_file(app_handle: AppHandle, db: State<'_, Database>) -> Result<String, String> {
+    let path = app_handle
+        .dialog()
+        .file()
+        .set_title("导入梦境记录")
+        .add_filter("JSON 文件", &["json"])
+        .blocking_pick_file();
+
+    match path {
+        Some(file_path) => {
+            let path = file_path.as_path().ok_or("无法获取文件路径")?;
+            let json = std::fs::read_to_string(path)
+                .map_err(|e| format!("读取文件失败: {}", e))?;
+            let data: ImportData = serde_json::from_str(&json)
+                .map_err(|e| format!("JSON 解析失败: {}", e))?;
+            let conn = db.conn.lock().map_err(|e| e.to_string())?;
+            let mut count = 0;
+            for dream in &data.dreams {
+                let id = dream.id.clone().unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+                let tags_json = dream.tags.clone().unwrap_or_else(|| "[]".into());
+                conn.execute(
+                    "INSERT OR REPLACE INTO dreams (id, title, content, user_mood, ai_mood, mood_score, emotions, tags, lucidity, dream_date)
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
+                    rusqlite::params![
+                        id,
+                        dream.title,
+                        dream.content,
+                        dream.user_mood,
+                        dream.ai_mood,
+                        dream.mood_score.unwrap_or(50),
+                        dream.emotions,
+                        tags_json,
+                        dream.lucidity.unwrap_or(0),
+                        dream.dream_date,
+                    ],
+                )
+                .map_err(|e| format!("导入失败: {}", e))?;
+                count += 1;
+            }
+            Ok(format!("成功导入 {} 条梦境记录", count))
+        }
+        None => Err("已取消导入".into()),
     }
 }
 

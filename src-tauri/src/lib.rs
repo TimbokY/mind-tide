@@ -41,6 +41,7 @@ pub fn run() {
             commands::dreams::export_dreams,
             commands::dreams::export_dreams_file,
             commands::dreams::import_dreams,
+            commands::dreams::import_dreams_file,
             commands::dreams::clear_all_dreams,
             commands::dreams::save_ai_summary,
             commands::dreams::get_ai_summary,

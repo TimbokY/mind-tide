@@ -1,6 +1,6 @@
 <h1 align="center">
   <br>
-  <img src="public/favicon.svg" alt="梦潮汐" width="80">
+  <img src="public/favicon.png" alt="梦潮汐" width="80">
   <br>
   梦潮汐 · MindTide
   <br>
@@ -35,12 +35,14 @@
 <td width="50%">
 
 ### 📝 梦境记录
+
 - 富文本梦境编辑，支持标题、内容、情绪标签
 - 清醒度评分（0-5 级滑动）
 - 自定义标签系统
 - 自动记录日期与时间
 
 ### 🤖 AI 智能分析
+
 - 一键 AI 解析梦境象征与潜意识
 - 自动提取情绪维度评分（恐惧/喜悦/悲伤/平静）
 - AI 生成梦境标签（与用户标签合并去重）
@@ -50,6 +52,7 @@
 <td width="50%">
 
 ### 📊 数据可视化
+
 - 情绪趋势面积图
 - 情绪维度径向柱状图
 - 梦境热度热力图（GitHub 贡献风格）
@@ -57,6 +60,7 @@
 - 双色气泡词云
 
 ### ⚙️ 多模态 AI
+
 - 内置本地模型（CPU 推理，无需网络）
 - Ollama 本地服务对接
 - OpenAI / DeepSeek 等兼容 API
@@ -72,16 +76,16 @@
 
 <div align="center">
 
-| 首页仪表盘 | 梦境记录 |
-|:---:|:---:|
+|                       首页仪表盘                       |                      梦境记录                       |
+| :----------------------------------------------------: | :-------------------------------------------------: |
 | <img src="docs/screenshots/dashboard.png" width="400"> | <img src="docs/screenshots/editor.png" width="400"> |
 
-| 日历回顾 | 可视化洞察 |
-|:---:|:---:|
+|                       日历回顾                        |                      可视化洞察                       |
+| :---------------------------------------------------: | :---------------------------------------------------: |
 | <img src="docs/screenshots/calendar.png" width="400"> | <img src="docs/screenshots/insights.png" width="400"> |
 
-| 设置中心 |
-|:---:|
+|                       设置中心                        |
+| :---------------------------------------------------: |
 | <img src="docs/screenshots/settings.png" width="400"> |
 
 </div>
@@ -101,18 +105,18 @@ React 19 + Vite 8 + TailwindCSS 4  ──IPC──▶  Tauri 2.0 (Rust)  ──S
                                                    └─ ai/prompts.rs       (3 个结构化 Prompt)
 ```
 
-| 层级 | 技术 | 说明 |
-|------|------|------|
-| **桌面壳** | Tauri 2.0 | 跨平台桌面应用，Rust 后端，WebView 前端 |
-| **前端** | React 19 + Vite 8 | TypeScript 严格模式，模块化组件架构 |
-| **样式** | TailwindCSS 4 + shadcn/ui | CSS-first，全局深色主题 `#0f172a` |
-| **路由** | React Router v7 | 5 页面 SPA 路由 |
-| **状态** | TanStack Query v5 | 服务端状态管理，1 分钟 staleTime |
-| **图表** | Recharts v3 | 声明式 React 图表库 |
-| **动画** | Framer Motion v12 | 页面过渡与组件动效 |
-| **数据库** | SQLite (rusqlite) | WAL 模式，外键约束，Mutex 线程安全 |
-| **AI** | llama-cpp-2 / reqwest | 本地 CPU 推理 + HTTP API 双模式 |
-| **Lint** | oxlint + tsc --noEmit | Rust 引擎的 TypeScript Linter |
+| 层级       | 技术                      | 说明                                    |
+| ---------- | ------------------------- | --------------------------------------- |
+| **桌面壳** | Tauri 2.0                 | 跨平台桌面应用，Rust 后端，WebView 前端 |
+| **前端**   | React 19 + Vite 8         | TypeScript 严格模式，模块化组件架构     |
+| **样式**   | TailwindCSS 4 + shadcn/ui | CSS-first，全局深色主题 `#0f172a`       |
+| **路由**   | React Router v7           | 5 页面 SPA 路由                         |
+| **状态**   | TanStack Query v5         | 服务端状态管理，1 分钟 staleTime        |
+| **图表**   | Recharts v3               | 声明式 React 图表库                     |
+| **动画**   | Framer Motion v12         | 页面过渡与组件动效                      |
+| **数据库** | SQLite (rusqlite)         | WAL 模式，外键约束，Mutex 线程安全      |
+| **AI**     | llama-cpp-2 / reqwest     | 本地 CPU 推理 + HTTP API 双模式         |
+| **Lint**   | oxlint + tsc --noEmit     | Rust 引擎的 TypeScript Linter           |
 
 ---
 
@@ -198,11 +202,11 @@ mind-tide/
 
 ### 三种运行模式
 
-| 模式 | 引擎 | 网络 | 硬件 | 适用模型 |
-|------|------|------|------|----------|
-| **内置本地** | llama-cpp-2 | ❌ 离线 | CPU-only | Qwen2.5 1.5B/3B/7B GGUF |
-| **Ollama** | HTTP API | ✅ 本地 | GPU 可选 | 任意 Ollama 模型 |
-| **OpenAI 兼容** | HTTP API | ✅ 远程 | 云端 | GPT-4o / DeepSeek / 兼容 API |
+| 模式            | 引擎        | 网络    | 硬件     | 适用模型                     |
+| --------------- | ----------- | ------- | -------- | ---------------------------- |
+| **内置本地**    | llama-cpp-2 | ❌ 离线 | CPU-only | Qwen2.5 1.5B/3B/7B GGUF      |
+| **Ollama**      | HTTP API    | ✅ 本地 | GPU 可选 | 任意 Ollama 模型             |
+| **OpenAI 兼容** | HTTP API    | ✅ 远程 | 云端     | GPT-4o / DeepSeek / 兼容 API |
 
 ### 四层 JSON 解析（永不报错）
 
@@ -225,12 +229,12 @@ AI 输出格式不稳定是常态。梦潮汐采用 4 层回退解析策略：
 
 5 张核心表，全部通过 `IF NOT EXISTS` 自动创建：
 
-| 表 | 用途 | 关键字段 |
-|----|------|----------|
-| `dreams` | 梦境主表 | id, title, content, user_mood, ai_mood, mood_score, emotions(JSON), tags(JSON), lucidity, dream_date |
-| `analyses` | AI 分析结果 | dream_id(FK→CASCADE), model_name, summary, symbols(JSON), insight |
-| `settings` | KV 配置 | key(PK), value |
-| `ai_summaries` | AI 摘要 | summary_type, ref_date, content(JSON), UNIQUE(type, date) |
+| 表             | 用途        | 关键字段                                                                                             |
+| -------------- | ----------- | ---------------------------------------------------------------------------------------------------- |
+| `dreams`       | 梦境主表    | id, title, content, user_mood, ai_mood, mood_score, emotions(JSON), tags(JSON), lucidity, dream_date |
+| `analyses`     | AI 分析结果 | dream_id(FK→CASCADE), model_name, summary, symbols(JSON), insight                                    |
+| `settings`     | KV 配置     | key(PK), value                                                                                       |
+| `ai_summaries` | AI 摘要     | summary_type, ref_date, content(JSON), UNIQUE(type, date)                                            |
 
 所有日期统一为 `YYYY-MM-DD` 字符串格式。
 
@@ -238,25 +242,25 @@ AI 输出格式不稳定是常态。梦潮汐采用 4 层回退解析策略：
 
 ## 🧭 路由
 
-| 路径 | 页面 | 功能 |
-|------|------|------|
-| `/` | Dashboard | 统计卡片 + 今日快讯 + 情绪趋势 |
-| `/editor` | EditorPage | 梦境编辑 + 一键 AI 解析 |
-| `/calendar` | CalendarPage | 时间线 + 迷你月历 + 情绪饼图 |
-| `/insights` | InsightsPage | 月度洞察 + 热度图 + 气泡词云 |
+| 路径        | 页面         | 功能                              |
+| ----------- | ------------ | --------------------------------- |
+| `/`         | Dashboard    | 统计卡片 + 今日快讯 + 情绪趋势    |
+| `/editor`   | EditorPage   | 梦境编辑 + 一键 AI 解析           |
+| `/calendar` | CalendarPage | 时间线 + 迷你月历 + 情绪饼图      |
+| `/insights` | InsightsPage | 月度洞察 + 热度图 + 气泡词云      |
 | `/settings` | SettingsPage | 多 AI 配置 + 模型下载 + 导入/导出 |
 
 ---
 
 ## 🛠️ 开发命令
 
-| 命令 | 说明 |
-|------|------|
-| `npm run dev` | Vite 开发服务器（仅前端） |
-| `npm run tauri dev` | 完整桌面应用 |
-| `npm run build` | TypeScript 检查 + Vite 构建 |
-| `npm run lint` | oxlint 代码检查 |
-| `cargo check` | Rust 类型检查（在 `src-tauri/` 下执行） |
+| 命令                | 说明                                    |
+| ------------------- | --------------------------------------- |
+| `npm run dev`       | Vite 开发服务器（仅前端）               |
+| `npm run tauri dev` | 完整桌面应用                            |
+| `npm run build`     | TypeScript 检查 + Vite 构建             |
+| `npm run lint`      | oxlint 代码检查                         |
+| `cargo check`       | Rust 类型检查（在 `src-tauri/` 下执行） |
 
 ---
 
