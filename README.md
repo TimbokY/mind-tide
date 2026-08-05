@@ -1,8 +1,8 @@
 <h1 align="center">
   <br>
-  <img src="public/favicon.png" alt="梦潮汐" width="80">
+  <img src="public/favicon.png" alt="MindTide" width="80">
   <br>
-  梦潮汐 · MindTide
+  MindTide
   <br>
 </h1>
 
@@ -210,7 +210,7 @@ mind-tide/
 
 ### 四层 JSON 解析（永不报错）
 
-AI 输出格式不稳定是常态。梦潮汐采用 4 层回退解析策略：
+AI 输出格式不稳定是常态。MindTide采用 4 层回退解析策略：
 
 1. **直接解析** — `serde_json::from_str`
 2. **代码块提取** — 识别 ` ```json ... ``` `

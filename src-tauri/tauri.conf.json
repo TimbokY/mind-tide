@@ -1,6 +1,6 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "梦潮汐",
+  "productName": "MindTide",
   "version": "0.1.0",
   "identifier": "com.mindtide.app",
   "build": {
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "梦潮汐",
+        "title": "MindTide",
         "width": 1200,
         "height": 800,
         "resizable": true,
@@ -25,7 +25,13 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["nsis", "dmg", "app", "deb", "appimage"],
+    "targets": [
+      "nsis",
+      "dmg",
+      "app",
+      "deb",
+      "appimage"
+    ],
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",

@@ -3,13 +3,13 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: "版本号（如 0.1.0，留空则从 tag 读取）"
+        description: '版本号（如 0.1.0，留空则从 tag 读取）'
         required: false
-        default: ""
+        default: ''
 
 jobs:
   build-macos:
@@ -31,11 +31,11 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ""
+          TAURI_SIGNING_PRIVATE_KEY: ''
         with:
           tagName: ${{ github.event.inputs.version || github.ref_name }}
-          releaseName: "梦潮汐 v__VERSION__"
-          releaseBody: "构建产物见附件。macOS 用户首次打开时若提示不受信任，请右键点击 App → 打开，或执行 `xattr -cr /Applications/梦潮汐.app`。"
+          releaseName: 'MindTide v__VERSION__'
+          releaseBody: '构建产物见附件。macOS 用户首次打开时若提示不受信任，请右键点击 App → 打开，或执行 `xattr -cr /Applications/MindTide.app`。'
           releaseDraft: true
           prerelease: false
 
@@ -58,10 +58,10 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          TAURI_SIGNING_PRIVATE_KEY: ""
+          TAURI_SIGNING_PRIVATE_KEY: ''
         with:
           tagName: ${{ github.event.inputs.version || github.ref_name }}
-          releaseName: "梦潮汐 v__VERSION__"
-          releaseBody: "构建产物见附件。"
+          releaseName: 'MindTide v__VERSION__'
+          releaseBody: '构建产物见附件。'
           releaseDraft: true
           prerelease: false

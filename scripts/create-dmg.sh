@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -e
 PROJECT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-APP_SRC="$PROJECT_DIR/src-tauri/target/release/bundle/macos/梦潮汐.app"
-DMG_OUT="$PROJECT_DIR/src-tauri/target/release/bundle/dmg/梦潮汐_0.1.0_aarch64.dmg"
-VOL_NAME="梦潮汐"
+APP_SRC="$PROJECT_DIR/src-tauri/target/release/bundle/macos/MindTide.app"
+DMG_OUT="$PROJECT_DIR/src-tauri/target/release/bundle/dmg/MindTide_0.1.0_aarch64.dmg"
+VOL_NAME="MindTide"
 
 echo "==> 创建 DMG: $DMG_OUT"
 rm -f "$DMG_OUT"

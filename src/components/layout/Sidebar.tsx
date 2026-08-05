@@ -1,14 +1,7 @@
 import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { motion, type Transition, type Variants } from 'framer-motion'
-import {
-  LayoutDashboard,
-  PenLine,
-  CalendarDays,
-  BarChart3,
-  Settings,
-  Sparkles,
-} from 'lucide-react'
+import { LayoutDashboard, PenLine, CalendarDays, BarChart3, Settings, Sparkles } from 'lucide-react'
 import { invoke } from '@/lib/tauri'
 import { cn } from '@/lib/utils'
 
@@ -44,8 +37,11 @@ export function Sidebar() {
 
   async function checkStatus() {
     try {
-      const config = await invoke<{provider: string; model_name: string}>('get_ai_config')
-      if (!config.model_name) { setAiStatus('unconfigured'); return }
+      const config = await invoke<{ provider: string; model_name: string }>('get_ai_config')
+      if (!config.model_name) {
+        setAiStatus('unconfigured')
+        return
+      }
       if (config.provider === 'builtin') {
         const loaded = await invoke<boolean>('is_local_model_loaded')
         setAiStatus(loaded ? 'ready' : 'unconfigured')
@@ -73,10 +69,7 @@ export function Sidebar() {
     >
       <div className="px-6 py-6">
         <h1 className="text-xl font-medium text-[#f8fafc] tracking-tight">
-          梦潮汐
-          <span className="block text-xs text-[#8b5cf6] font-normal mt-1">
-            MindTide
-          </span>
+          <span className="block text-xs text-[#8b5cf6] font-normal mt-1">MindTide</span>
         </h1>
       </div>
 
@@ -97,7 +90,7 @@ export function Sidebar() {
                     'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-300',
                     isActive
                       ? 'bg-[#8b5cf6]/15 text-[#8b5cf6] shadow-[0_0_20px_rgba(139,92,246,0.1)]'
-                      : 'text-[#94a3b8] hover:text-[#f8fafc] hover:bg-white/5',
+                      : 'text-[#94a3b8] hover:text-[#f8fafc] hover:bg-white/5'
                   )
                 }
               >
@@ -125,14 +118,14 @@ export function Sidebar() {
               {statusConfig.text}
             </p>
           </div>
-          <Sparkles className={cn(
-            'w-3 h-3 ml-auto shrink-0 transition-all',
-            aiStatus === 'ready' ? 'text-[#8b5cf6]' : 'text-[#64748b]/30',
-          )} />
+          <Sparkles
+            className={cn(
+              'w-3 h-3 ml-auto shrink-0 transition-all',
+              aiStatus === 'ready' ? 'text-[#8b5cf6]' : 'text-[#64748b]/30'
+            )}
+          />
         </NavLink>
-        <p className="text-[10px] text-[#64748b]/50 px-3">
-          记录梦境起伏，看见潜意识潮汐
-        </p>
+        <p className="text-[10px] text-[#64748b]/50 px-3">记录梦境起伏，看见潜意识潮汐</p>
       </div>
     </motion.aside>
   )

@@ -1,4 +1,4 @@
-# AGENTS.md — mind-tide（梦潮汐）
+# AGENTS.md — mind-tide
 
 ## Dev commands
 
@@ -30,13 +30,13 @@ React 19 + Vite 8 + TailwindCSS 4  ──IPC──▶  Tauri 2.0 (Rust)  ──S
 
 ## Routing (5 pages)
 
-| Path | Page | Key data |
-|------|------|----------|
-| `/` | Dashboard | Stats cards, today summary, mood trend |
-| `/editor` | EditorPage | Save dream + "一键 AI 解析" |
-| `/calendar` | CalendarPage | Timeline + mini calendar + mood pie |
+| Path        | Page         | Key data                                        |
+| ----------- | ------------ | ----------------------------------------------- |
+| `/`         | Dashboard    | Stats cards, today summary, mood trend          |
+| `/editor`   | EditorPage   | Save dream + "一键 AI 解析"                     |
+| `/calendar` | CalendarPage | Timeline + mini calendar + mood pie             |
 | `/insights` | InsightsPage | Monthly insight card + charts + dual word cloud |
-| `/settings` | SettingsPage | Provider switch, model download, import/export |
+| `/settings` | SettingsPage | Provider switch, model download, import/export  |
 
 ## AI integration (3 providers)
 
