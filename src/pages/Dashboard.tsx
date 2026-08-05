@@ -13,8 +13,16 @@ import {
   Cpu,
   ArrowRight,
   Download,
+  Brain,
+  Gauge,
+  CalendarDays,
+  TrendingUp,
+  Sun,
+  Moon,
+  Zap,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { moodLabels } from '@/constants/moods'
 
 interface DashboardStats {
   total_dreams: number
@@ -23,9 +31,12 @@ interface DashboardStats {
   top_mood: string
 }
 
-const moodLabels: Record<string, string> = {
-  joy: '喜悦', sadness: '悲伤', fear: '恐惧',
-  anger: '愤怒', surprise: '惊讶', calm: '平静', neutral: '中性',
+function detectEmotionIcon(text: string) {
+  if (/喜悦|快乐|开心|高兴|欢|笑/.test(text)) return Sun
+  if (/悲伤|难过|哭泣|泪|哀|伤心/.test(text)) return Moon
+  if (/恐惧|害怕|惊|吓|慌|不安/.test(text)) return Zap
+  if (/平静|安静|宁|放松|安/.test(text)) return Moon
+  return Sun
 }
 
 export default function Dashboard() {
@@ -100,20 +111,25 @@ export default function Dashboard() {
       {/* 统计卡片 */}
       <div className="grid grid-cols-4 gap-4">
         {[
-          { label: '总梦境记录数', value: stats?.total_dreams ?? 0, sub: '条', onClick: () => navigate('/calendar') },
-          { label: '本月平均情绪分', value: stats?.monthly_avg_score ?? '--', sub: '/100' },
-          { label: '本周梦境条数', value: stats?.weekly_count ?? 0, sub: '条' },
-          { label: '高频情绪标签', value: stats?.top_mood ? moodLabels[stats.top_mood] ?? stats.top_mood : '--', sub: '' },
-        ].map((stat, i) => (
-          <motion.div key={stat.label}
-            initial={{ opacity: 0, y: 20 }}
+          { label: '总梦境记录数', value: stats?.total_dreams ?? 0, sub: '条', icon: Brain, onClick: () => navigate('/calendar') },
+          { label: '本月平均情绪分', value: stats?.monthly_avg_score ?? '--', sub: '/100', icon: Gauge },
+          { label: '本周梦境条数', value: stats?.weekly_count ?? 0, sub: '条', icon: CalendarDays },
+          { label: '高频情绪标签', value: stats?.top_mood ? moodLabels[stats.top_mood] ?? stats.top_mood : '--', sub: '', icon: TrendingUp },
+        ].map((stat, i) => {
+          const Icon = stat.icon
+           return (
+            <motion.div key={stat.label}
+              initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.08, duration: 0.4, ease: 'easeOut' } as Transition}
           >
             <GlowCard className={cn('p-4', stat.onClick && 'cursor-pointer hover:bg-white/[0.06]')}>
               <div onClick={stat.onClick}>
-                <p className="text-xs text-[#94a3b8]">{stat.label}</p>
-                <p className="text-2xl font-medium mt-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <Icon className="w-3.5 h-3.5 text-[#64748b]" />
+                  <p className="text-xs text-[#94a3b8]">{stat.label}</p>
+                </div>
+                <p className="text-2xl font-medium">
                   {typeof stat.value === 'number' && stat.sub === '/100'
                     ? (stat.value as number).toFixed(1) : stat.value}
                   <span className="text-sm text-[#64748b] ml-1">{stat.sub}</span>
@@ -121,7 +137,7 @@ export default function Dashboard() {
               </div>
             </GlowCard>
           </motion.div>
-        ))}
+        )})}
       </div>
 
       {/* AI 引擎卡片 + 今日摘要 */}
@@ -195,7 +211,11 @@ export default function Dashboard() {
             )}
           </div>
           {todaySummary ? (
-            <p className="text-sm text-[#94a3b8] leading-relaxed">{todaySummary}</p>
+            <div className="flex items-start gap-2.5">
+              {(() => { const Icon = detectEmotionIcon(todaySummary)
+                return <Icon className="w-4 h-4 text-[#8b5cf6] shrink-0 mt-0.5" /> })()}
+              <p className="text-sm text-[#94a3b8] leading-relaxed">{todaySummary}</p>
+            </div>
           ) : (
             <p className="text-xs text-[#64748b]">
               {aiReady ? '点击「生成」获取 AI 为你总结的今日梦境简报' : '配置 AI 后即可自动生成今日梦境简报'}

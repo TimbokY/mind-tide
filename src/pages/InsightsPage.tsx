@@ -4,7 +4,7 @@ import { invoke } from '@/lib/tauri'
 import { GlowCard } from '@/components/ui/glow-card'
 import { Button } from '@/components/ui/button'
 import { MoodTrendChart } from '@/components/charts/MoodTrendChart'
-import { EmotionRadar } from '@/components/charts/EmotionRadar'
+import { EmotionBar } from '@/components/charts/EmotionBar'
 import { DreamHeatmap } from '@/components/charts/DreamHeatmap'
 import { BubbleChart } from '@/components/charts/BubbleChart'
 import { cn } from '@/lib/utils'
@@ -308,20 +308,33 @@ export default function InsightsPage() {
 
             {/* ---- 情绪维度对比 ---- */}
             {insight.emotion_shift && (
-              <div className="grid grid-cols-4 gap-2">
-                {['fear', 'joy', 'sadness', 'calm'].map((key) => {
+              <div className="grid grid-cols-4 gap-3">
+                {(['fear', 'joy', 'sadness', 'calm'] as const).map((key) => {
                   const val = insight.emotion_shift![key] ?? 0
                   const labels: Record<string, string> = { fear: '恐惧', joy: '喜悦', sadness: '悲伤', calm: '平静' }
                   const colors: Record<string, string> = { fear: '#ef4444', joy: '#10b981', sadness: '#6366f1', calm: '#8b5cf6' }
+                  const absVal = Math.abs(val)
+                  const maxVal = Math.max(...Object.values(insight.emotion_shift!).map(v => Math.abs(v)), 1)
+                  const widthPct = Math.round((absVal / maxVal) * 100)
                   return (
-                    <div key={key}
-                      className="px-2.5 py-2 rounded-lg text-center bg-white/[0.02] border border-white/[0.04]"
-                    >
-                      <div className="text-[10px] text-[#64748b] mb-0.5">{labels[key]}</div>
-                      <div className="text-xs font-medium" style={{ color: colors[key] }}>
-                        {val > 0 ? '+' : ''}{val}
+                    <div key={key} className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] text-[#94a3b8]">{labels[key]}</span>
+                        <span className="text-[11px] font-medium" style={{ color: colors[key] }}>
+                          {val > 0 ? '+' : ''}{val}
+                        </span>
                       </div>
-                      <div className="text-[9px] text-[#64748b]/50">vs 上月</div>
+                      <div className="h-2 rounded-full bg-white/[0.04] overflow-hidden">
+                        <div
+                          className="h-full rounded-full transition-all"
+                          style={{
+                            width: `${widthPct}%`,
+                            backgroundColor: colors[key],
+                            opacity: 0.6,
+                          }}
+                        />
+                      </div>
+                      <span className="text-[9px] text-[#64748b]/50">vs 上月</span>
                     </div>
                   )
                 })}
@@ -355,8 +368,8 @@ export default function InsightsPage() {
 
       <div className="grid grid-cols-2 gap-4">
         <GlowCard className="p-5">
-          <h3 className="text-sm font-medium text-[#94a3b8] mb-2">多维情绪分布均值</h3>
-          <EmotionRadar days={timeRange} />
+          <h3 className="text-sm font-medium text-[#94a3b8] mb-2">情绪维度对比</h3>
+          <EmotionBar days={timeRange} />
         </GlowCard>
         <GlowCard className="p-5">
           <h3 className="text-sm font-medium text-[#94a3b8] mb-4">梦境活跃周期热力</h3>
@@ -381,6 +394,16 @@ export default function InsightsPage() {
                 maxWords={15}
               />
             </div>
+            {tags && tags.length > 0 && (
+              <div className="flex items-center gap-3 text-[11px] text-[#64748b] justify-center">
+                {(tags.slice(0, 3)).map((t, i) => (
+                  <span key={t.tag} className="flex items-center gap-1">
+                    <span className="text-[#8b5cf6]">#{i + 1}</span> {t.tag}
+                    <span className="text-[#64748b]/50">{t.count}次</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
@@ -396,6 +419,16 @@ export default function InsightsPage() {
                 maxWords={15}
               />
             </div>
+            {aiSymbols && aiSymbols.length > 0 && (
+              <div className="flex items-center gap-3 text-[11px] text-[#64748b] justify-center">
+                {(aiSymbols.slice(0, 3)).map((t, i) => (
+                  <span key={t.tag} className="flex items-center gap-1">
+                    <span className="text-[#14b8a6]">#{i + 1}</span> {t.tag}
+                    <span className="text-[#64748b]/50">{t.count}次</span>
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </GlowCard>

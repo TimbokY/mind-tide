@@ -8,7 +8,7 @@ import { MonthTrend } from '@/components/charts/MonthTrend'
 import { MoodPie } from '@/components/charts/MoodPie'
 import { DreamTimeline } from '@/components/charts/DreamTimeline'
 import { cn } from '@/lib/utils'
-import { ChevronLeft, ChevronRight, BarChart3 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, BarChart3, Star } from 'lucide-react'
 
 interface CalendarDream {
   id: string
@@ -88,6 +88,11 @@ export default function CalendarPage() {
     return Object.entries(c).sort((a, b) => b[1] - a[1]).slice(0, 5)
   }, [groups])
 
+  const monthlyLucidity = useMemo(() => {
+    let total = 0; let count = 0
+    groups?.forEach((g) => g.dreams.forEach((d) => { total += d.lucidity; count++ }))
+    return count ? total / count : 0
+  }, [groups])
   const totalDreams = groups?.reduce((s, g) => s + g.dreams.length, 0) ?? 0
   const monthlyAvg = groups?.length
     ? Math.round(groups.reduce((s, g) => s + g.avgScore, 0) / groups.length)
@@ -285,16 +290,39 @@ export default function CalendarPage() {
             {topTags.length > 0 && (
               <GlowCard className="p-4">
                 <h4 className="text-[11px] font-medium text-[#64748b] mb-2">高频标签</h4>
-                <div className="space-y-1.5">
-                  {topTags.map(([tag, count], i) => (
-                    <div key={tag} className="flex items-center justify-between text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="w-4 h-4 rounded-full bg-[#8b5cf6]/15 text-[10px] text-[#8b5cf6] flex items-center justify-center">{i + 1}</span>
-                        <span className="text-[#94a3b8]">{tag}</span>
-                      </div>
-                      <span className="text-[#64748b]">{count}次</span>
-                    </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {topTags.map(([tag, count]) => {
+                    const maxCount = topTags[0][1]
+                    const ratio = count / maxCount
+                    const size = ratio > 0.8 ? 'text-[13px] px-2.5 py-1' : ratio > 0.5 ? 'text-[11px] px-2 py-0.5' : 'text-[10px] px-1.5 py-0.5'
+                    const opacity = 0.55 + ratio * 0.45
+                    return (
+                      <span
+                        key={tag}
+                        className={`inline-flex items-center rounded-lg font-medium bg-[#8b5cf6]/15 border border-[#8b5cf6]/20 transition-all ${size}`}
+                        style={{ color: '#a78bfa', opacity }}
+                      >
+                        {tag} <span className="text-[#64748b]/50 ml-0.5">{count}</span>
+                      </span>
+                    )
+                  })}
+                </div>
+              </GlowCard>
+            )}
+            {monthlyLucidity > 0 && (
+              <GlowCard className="p-4">
+                <h4 className="text-[11px] font-medium text-[#64748b] mb-2">平均清醒度</h4>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star
+                      key={s}
+                      className={s <= Math.round(monthlyLucidity) ? 'w-4 h-4' : 'w-4 h-4'}
+                      fill={s <= Math.round(monthlyLucidity) ? '#eab308' : 'none'}
+                      stroke={s <= Math.round(monthlyLucidity) ? '#eab308' : '#334155'}
+                      strokeWidth={1.5}
+                    />
                   ))}
+                  <span className="text-[11px] text-[#64748b] ml-1.5">{monthlyLucidity.toFixed(1)}/5</span>
                 </div>
               </GlowCard>
             )}
