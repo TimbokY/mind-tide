@@ -497,25 +497,6 @@ fn extract_text_from_response(body: &serde_json::Value) -> Result<&str, String> 
     ))
 }
 
-pub async fn call_ai_text(
-    api_url: &str,
-    api_key: &str,
-    model_name: &str,
-    user_prompt: &str,
-) -> Result<String, String> {
-    call_ai_text_with_system(api_url, api_key, model_name, None, user_prompt).await
-}
-
-pub async fn call_ai_text_with_system(
-    api_url: &str,
-    api_key: &str,
-    model_name: &str,
-    system_prompt: Option<&str>,
-    user_prompt: &str,
-) -> Result<String, String> {
-    call_ai_text_with_system_and_tokens(api_url, api_key, model_name, system_prompt, user_prompt, 1024).await
-}
-
 pub async fn call_ai_text_with_system_and_tokens(
     api_url: &str,
     api_key: &str,
@@ -545,7 +526,7 @@ pub async fn call_ai_text_with_system_and_tokens(
             "model": model_name,
             "messages": messages,
             "temperature": 0.8,
-            "max_tokens": 1024
+            "max_tokens": max_tokens
         }))
         .send()
         .await

@@ -437,9 +437,10 @@ pub async fn export_dreams_file(app_handle: AppHandle, db: State<'_, Database>) 
 
     match path {
         Some(file_path) => {
-            std::fs::write(file_path.as_path().unwrap(), &json)
+            let path = file_path.as_path().ok_or("无法获取文件路径")?;
+            std::fs::write(path, &json)
                 .map_err(|e| format!("写入文件失败: {}", e))?;
-            Ok(format!("已导出到 {}", file_path.as_path().unwrap().display()))
+            Ok(format!("已导出到 {}", path.display()))
         }
         None => Err("已取消导出".into()),
     }

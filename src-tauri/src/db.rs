@@ -52,6 +52,8 @@ impl Database {
 
             CREATE INDEX IF NOT EXISTS idx_dreams_date ON dreams(dream_date);
             CREATE INDEX IF NOT EXISTS idx_dreams_ai_mood ON dreams(ai_mood);
+            CREATE INDEX IF NOT EXISTS idx_dreams_created_at ON dreams(created_at);
+            CREATE INDEX IF NOT EXISTS idx_analyses_dream_id ON analyses(dream_id);
 
             CREATE TABLE IF NOT EXISTS settings (
                 key   TEXT PRIMARY KEY,
