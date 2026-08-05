@@ -41,13 +41,16 @@ interface DownloadableModelInfo {
   filename: string
 }
 
-const PRESETS: Record<string, {
-  label: string
-  icon: typeof Cpu
-  url?: string
-  key?: string
-  placeholder?: string
-}> = {
+const PRESETS: Record<
+  string,
+  {
+    label: string
+    icon: typeof Cpu
+    url?: string
+    key?: string
+    placeholder?: string
+  }
+> = {
   builtin: {
     label: '内置本地引擎',
     icon: Box,
@@ -87,7 +90,10 @@ export default function SettingsPage() {
   const [availableModels, setAvailableModels] = useState<DownloadableModelInfo[]>([])
   const [modelExists, setModelExists] = useState<Record<string, boolean>>({})
   const [downloading, setDownloading] = useState<string | null>(null)
-  const [downloadProgress, setDownloadProgress] = useState<{downloaded: number; total: number} | null>(null)
+  const [downloadProgress, setDownloadProgress] = useState<{
+    downloaded: number
+    total: number
+  } | null>(null)
   const [modelLoaded, setModelLoaded] = useState(false)
 
   const [exporting, setExporting] = useState(false)
@@ -104,16 +110,18 @@ export default function SettingsPage() {
     loadConfig()
     loadAvailableModels()
 
-    const unlisten = listen<{downloaded: number; total: number; filename: string}>(
+    const unlisten = listen<{ downloaded: number; total: number; filename: string }>(
       'model-download-progress',
       (event) => {
         setDownloadProgress({
           downloaded: event.payload.downloaded,
           total: event.payload.total,
         })
-      },
+      }
     )
-    return () => { unlisten.then((fn) => fn()) }
+    return () => {
+      unlisten.then((fn) => fn())
+    }
   }, [])
 
   useEffect(() => {
@@ -333,9 +341,7 @@ export default function SettingsPage() {
         provider,
         api_url: preset.url ?? '',
         api_key: preset.key ?? '',
-        model_name: provider === 'builtin'
-          ? 'qwen2.5-1.5b-instruct-q4_k_m.gguf'
-          : '',
+        model_name: provider === 'builtin' ? 'qwen2.5-1.5b-instruct-q4_k_m.gguf' : '',
       })
     }
     setOllamaModels([])
@@ -344,8 +350,8 @@ export default function SettingsPage() {
   }
 
   const formatSize = (bytes: number) => {
-    if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024*1024*1024)).toFixed(1)} GB`
-    if (bytes >= 1024 * 1024) return `${(bytes / (1024*1024)).toFixed(1)} MB`
+    if (bytes >= 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024 * 1024)).toFixed(1)} GB`
+    if (bytes >= 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
     return `${(bytes / 1024).toFixed(0)} KB`
   }
 
@@ -376,13 +382,13 @@ export default function SettingsPage() {
                     'flex flex-col items-center gap-2 py-3 px-2 rounded-xl text-sm transition-all',
                     config.provider === key
                       ? 'bg-[#8b5cf6]/15 text-[#f8fafc] ring-1 ring-[#8b5cf6]/40'
-                      : 'bg-white/5 text-[#94a3b8] hover:bg-white/10',
+                      : 'bg-white/5 text-[#94a3b8] hover:bg-white/10'
                   )}
                 >
                   <Icon
                     className={cn(
                       'w-5 h-5',
-                      config.provider === key ? 'text-[#8b5cf6]' : 'text-[#64748b]',
+                      config.provider === key ? 'text-[#8b5cf6]' : 'text-[#64748b]'
                     )}
                   />
                   {preset.label}
@@ -410,9 +416,7 @@ export default function SettingsPage() {
                       key={m.filename}
                       className={cn(
                         'flex items-center justify-between p-3 rounded-xl transition-all',
-                        isSelected
-                          ? 'bg-[#8b5cf6]/10 ring-1 ring-[#8b5cf6]/20'
-                          : 'bg-white/5',
+                        isSelected ? 'bg-[#8b5cf6]/10 ring-1 ring-[#8b5cf6]/20' : 'bg-white/5'
                       )}
                     >
                       <div className="flex-1 min-w-0">
@@ -426,15 +430,17 @@ export default function SettingsPage() {
                               <div
                                 className="h-1.5 rounded-full bg-[#8b5cf6] transition-all"
                                 style={{
-                                  width: downloadProgress.total > 0
-                                    ? `${(downloadProgress.downloaded / downloadProgress.total) * 100}%`
-                                    : '0%',
+                                  width:
+                                    downloadProgress.total > 0
+                                      ? `${(downloadProgress.downloaded / downloadProgress.total) * 100}%`
+                                      : '0%',
                                 }}
                               />
                             </div>
                             <p className="text-[10px] text-[#64748b] mt-0.5">
                               {formatSize(downloadProgress.downloaded)}
-                              {downloadProgress.total > 0 && ` / ${formatSize(downloadProgress.total)}`}
+                              {downloadProgress.total > 0 &&
+                                ` / ${formatSize(downloadProgress.total)}`}
                             </p>
                           </div>
                         )}
@@ -449,7 +455,7 @@ export default function SettingsPage() {
                               onClick={() => setConfig((p) => ({ ...p, model_name: m.filename }))}
                               className={cn(
                                 'h-7 text-xs rounded-lg',
-                                isSelected ? 'bg-[#8b5cf6]/20 text-[#8b5cf6]' : 'text-[#94a3b8]',
+                                isSelected ? 'bg-[#8b5cf6]/20 text-[#8b5cf6]' : 'text-[#94a3b8]'
                               )}
                             >
                               {isSelected ? '已选' : '选择'}
@@ -481,7 +487,9 @@ export default function SettingsPage() {
             <div className="flex items-center gap-2 p-3 bg-white/5 rounded-xl">
               <div className="flex-1">
                 <p className="text-xs text-[#94a3b8]">已加载模型</p>
-                <p className="text-sm text-[#f8fafc]">{modelLoaded ? config.model_name || '已就绪' : '未加载'}</p>
+                <p className="text-sm text-[#f8fafc]">
+                  {modelLoaded ? config.model_name || '已就绪' : '未加载'}
+                </p>
               </div>
               <Button
                 variant="outline"
@@ -573,7 +581,7 @@ export default function SettingsPage() {
                           'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm',
                           config.model_name === m.name
                             ? 'bg-[#8b5cf6]/15 text-[#8b5cf6] ring-1 ring-[#8b5cf6]/30'
-                            : 'bg-white/5 text-[#94a3b8] hover:bg-white/10',
+                            : 'bg-white/5 text-[#94a3b8] hover:bg-white/10'
                         )}
                       >
                         <span className="font-medium">{m.name}</span>
@@ -636,7 +644,7 @@ export default function SettingsPage() {
                 ? 'text-[#10b981] border-[#10b981]/30'
                 : testResult === 'fail'
                   ? 'text-[#ef4444] border-[#ef4444]/30'
-                  : 'text-[#94a3b8]',
+                  : 'text-[#94a3b8]'
             )}
           >
             {testResult === 'testing' ? (
@@ -662,7 +670,7 @@ export default function SettingsPage() {
           </li>
           <li className="flex items-start gap-2">
             <Cpu className="w-4 h-4 text-[#8b5cf6] mt-0.5 shrink-0" />
-            <span>Ollama 本地：需要先安装 Ollama 并拉取模型（brew install ollama），模型不离开本机</span>
+            <span>Ollama 本地：需要先安装 Ollama 并拉取模型，模型不离开本机</span>
           </li>
           <li className="flex items-start gap-2">
             <Globe className="w-4 h-4 text-[#8b5cf6] mt-0.5 shrink-0" />
@@ -681,7 +689,9 @@ export default function SettingsPage() {
             variant="outline"
             className={cn(
               'border-white/10 rounded-xl h-9 transition-colors duration-300',
-              exported ? 'text-[#10b981] border-[#10b981]/30' : 'text-[#94a3b8] hover:text-[#f8fafc]',
+              exported
+                ? 'text-[#10b981] border-[#10b981]/30'
+                : 'text-[#94a3b8] hover:text-[#f8fafc]'
             )}
           >
             {exporting ? (
@@ -716,11 +726,17 @@ export default function SettingsPage() {
         </div>
 
         {importMessage && (
-          <p className={cn(
-            'text-xs flex items-center gap-1.5',
-            importMessage.includes('失败') ? 'text-[#ef4444]' : 'text-[#10b981]',
-          )}>
-            {importMessage.includes('失败') ? <AlertCircle className="w-3 h-3" /> : <CheckCircle2 className="w-3 h-3" />}
+          <p
+            className={cn(
+              'text-xs flex items-center gap-1.5',
+              importMessage.includes('失败') ? 'text-[#ef4444]' : 'text-[#10b981]'
+            )}
+          >
+            {importMessage.includes('失败') ? (
+              <AlertCircle className="w-3 h-3" />
+            ) : (
+              <CheckCircle2 className="w-3 h-3" />
+            )}
             {importMessage}
           </p>
         )}
@@ -776,7 +792,10 @@ export default function SettingsPage() {
                   确认清除
                 </Button>
                 <Button
-                  onClick={() => { setClearStep('idle'); setClearConfirmText('') }}
+                  onClick={() => {
+                    setClearStep('idle')
+                    setClearConfirmText('')
+                  }}
                   variant="ghost"
                   className="text-[#64748b] rounded-lg text-xs h-8"
                 >
