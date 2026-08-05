@@ -7,6 +7,7 @@ interface MoodPieProps {
 export function MoodPie({ data }: MoodPieProps) {
   if (data.length === 0) return null
 
+  const total = data.reduce((sum, d) => sum + d.value, 0)
   return (
     <div className="h-40">
       <ResponsiveContainer width="100%" height="100%">
@@ -31,7 +32,12 @@ export function MoodPie({ data }: MoodPieProps) {
               borderRadius: '6px',
               fontSize: 11,
             }}
-            formatter={(v) => [`${v} 条`, '']}
+            formatter={(v, _name, props) => {
+              const val = Number(v) || 0
+              const pct = total > 0 ? Math.round((val / total) * 100) : 0
+              const name = props?.payload?.name ?? ''
+              return [`${name}: ${val}条 (${pct}%)`, '']
+            }}
           />
         </PieChart>
       </ResponsiveContainer>

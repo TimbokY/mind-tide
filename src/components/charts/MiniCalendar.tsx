@@ -41,9 +41,9 @@ export function MiniCalendar({ year, month, activeDates, onDateClick }: MiniCale
               onClick={() => onDateClick(ds)}
               className={cn(
                 'aspect-square flex items-center justify-center rounded-md text-[11px] transition-colors',
-                is && 'ring-1 ring-inset ring-[#8b5cf6]',
+                is && 'ring-2 ring-[#8b5cf6] ring-inset',
                 has
-                  ? 'bg-white/10 text-[#f8fafc] hover:bg-white/15 font-medium'
+                  ? 'bg-[#8b5cf6]/20 text-[#f8fafc] hover:bg-[#8b5cf6]/30 font-medium'
                   : 'text-[#64748b]/30',
               )}
             >
