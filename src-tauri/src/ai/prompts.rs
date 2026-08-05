@@ -70,7 +70,7 @@ pub const MONTHLY_INSIGHT_PROMPT: &str = r#"
 "#;
 
 pub const TODAY_SUMMARY_PROMPT: &str = r#"
-用户今天记录了以下梦境，请用一句温暖治愈的中文简短总结（30字内），不输出任何其他内容：
+用一句话（不超过25个汉字）概括今天的梦境状态，语气温暖治愈。只输出概括文本，禁止输出任何解释、标点外的符号或换行：
 
 {content}
 "#;

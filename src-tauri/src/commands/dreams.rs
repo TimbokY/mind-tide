@@ -1164,11 +1164,16 @@ pub async fn generate_today_summary(
     let content = dreams.join("、");
     let prompt = crate::ai::prompts::TODAY_SUMMARY_PROMPT.replace("{content}", &content);
 
-    let result = if input.provider.as_deref() == Some("builtin") {
-        crate::ai::local_model::run_text_simple(&prompt)
+    let raw = if input.provider.as_deref() == Some("builtin") {
+        crate::ai::local_model::run_inference_with_params(&prompt, 2048u32, 60)
     } else {
-        crate::ai::call_ai_text(&input.api_url, &input.api_key, &input.model_name, &prompt).await
+        crate::ai::call_ai_text_with_system_and_tokens(
+            &input.api_url, &input.api_key, &input.model_name,
+            None, &prompt, 100,
+        ).await
     }?;
+
+    let result = raw.trim().chars().take(60).collect::<String>();
 
     let ref_date = chrono::Local::now().format("%Y-%m-%d").to_string();
     let _ = save_summary_internal(&db, "today", &ref_date, &result);

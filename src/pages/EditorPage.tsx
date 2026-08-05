@@ -121,6 +121,12 @@ export default function EditorPage() {
       setAiResult(null)
       setAiExpanded(false)
 
+      queryClient.invalidateQueries({ queryKey: ['moodTrend'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboardStats'] })
+      queryClient.invalidateQueries({ queryKey: ['dreamsByMonth'] })
+      queryClient.invalidateQueries({ queryKey: ['dreamHeatmap'] })
+      queryClient.invalidateQueries({ queryKey: ['tagFrequencies'] })
+
       setTimeout(() => setSaved(false), 3000)
     } catch (error) {
       console.error('保存失败:', error)

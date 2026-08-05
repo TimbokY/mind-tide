@@ -129,6 +129,9 @@ export default function CalendarPage() {
       queryClient.invalidateQueries({ queryKey: ['dreamsByMonth'] })
       queryClient.invalidateQueries({ queryKey: ['dashboardStats'] })
       queryClient.invalidateQueries({ queryKey: ['moodTrend'] })
+      queryClient.invalidateQueries({ queryKey: ['emotionRadar'] })
+      queryClient.invalidateQueries({ queryKey: ['dreamHeatmap'] })
+      queryClient.invalidateQueries({ queryKey: ['tagFrequencies'] })
     } catch (e) { console.error('删除失败:', e) }
   }, [queryClient])
 
@@ -148,6 +151,7 @@ export default function CalendarPage() {
       queryClient.invalidateQueries({ queryKey: ['dashboardStats'] })
       queryClient.invalidateQueries({ queryKey: ['moodTrend'] })
       queryClient.invalidateQueries({ queryKey: ['emotionRadar'] })
+      queryClient.invalidateQueries({ queryKey: ['dreamHeatmap'] })
       queryClient.invalidateQueries({ queryKey: ['tagFrequencies'] })
     } catch (e) {
       console.error('重新解读失败:', e)

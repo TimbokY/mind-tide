@@ -35,7 +35,6 @@ export default function Dashboard() {
   const { data: stats, isLoading } = useQuery({
     queryKey: ['dashboardStats'],
     queryFn: () => invoke<DashboardStats>('get_dashboard_stats'),
-    refetchInterval: 30000,
   })
 
   const { data: aiConfig } = useQuery({
@@ -53,7 +52,6 @@ export default function Dashboard() {
       return true
     },
     enabled: !!aiConfig,
-    refetchInterval: 10000,
   })
 
   const { data: todaySummary, refetch: refetchToday, isRefetching: todayRefetching } = useQuery({

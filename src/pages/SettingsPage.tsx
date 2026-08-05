@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -81,6 +82,7 @@ export default function SettingsPage() {
   const [fetchingModels, setFetchingModels] = useState(false)
   const [modelFetchError, setModelFetchError] = useState<string | null>(null)
   const [testResult, setTestResult] = useState<'idle' | 'testing' | 'ok' | 'fail'>('idle')
+  const queryClient = useQueryClient()
 
   const [availableModels, setAvailableModels] = useState<DownloadableModelInfo[]>([])
   const [modelExists, setModelExists] = useState<Record<string, boolean>>({})
@@ -174,6 +176,7 @@ export default function SettingsPage() {
       await invoke('save_ai_config', { config })
       providerCache.current[config.provider] = { ...config }
       await invoke('save_all_ai_configs', { configs: providerCache.current })
+      queryClient.invalidateQueries({ queryKey: ['aiConfig'] })
       setSaved(true)
       setTimeout(() => setSaved(false), 3000)
     } catch (e) {
