@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { cn } from '@/lib/utils'
+import { moodLabels } from '@/constants/moods'
 import { Smile, Frown, Meh, Trash2, ChevronDown, RefreshCw, Sparkles } from 'lucide-react'
 
 interface Dream {
@@ -32,10 +33,6 @@ interface DreamTimelineProps {
 }
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六']
-const moodLabels: Record<string, string> = {
-  joy: '喜悦', sadness: '悲伤', fear: '恐惧',
-  anger: '愤怒', surprise: '惊讶', calm: '平静', neutral: '中性',
-}
 
 function mColor(score: number) {
   if (score >= 70) return { bar: 'bg-green-500', text: 'text-green-400' }

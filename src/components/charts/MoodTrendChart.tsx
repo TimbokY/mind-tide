@@ -9,22 +9,13 @@ import {
 } from 'recharts'
 import { useQuery } from '@tanstack/react-query'
 import { invoke } from '@/lib/tauri'
+import { moodLabels } from '@/constants/moods'
 
 interface TrendData {
   date: string
   score: number
   primary_mood: string
   count: number
-}
-
-const moodLabels: Record<string, string> = {
-  joy: '喜悦',
-  sadness: '悲伤',
-  fear: '恐惧',
-  anger: '愤怒',
-  surprise: '惊讶',
-  calm: '平静',
-  neutral: '中性',
 }
 
 export function MoodTrendChart({ days }: { days: number }) {
