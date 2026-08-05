@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::ai::local_model;
@@ -168,11 +169,7 @@ pub fn check_local_model(
     filename: String,
     app_handle: AppHandle,
 ) -> Result<bool, String> {
-    let models_dir = app_handle
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("models");
+    let models_dir = get_models_dir(&app_handle)?;
     Ok(local_model::check_model_exists(&models_dir, &filename))
 }
 
@@ -187,11 +184,7 @@ pub async fn download_local_model(
     url: String,
     app_handle: AppHandle,
 ) -> Result<String, String> {
-    let models_dir = app_handle
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("models");
+    let models_dir = get_models_dir(&app_handle)?;
 
     let model = local_model::available_models()
         .into_iter()
@@ -221,11 +214,7 @@ pub fn load_local_model(
     filename: String,
     app_handle: AppHandle,
 ) -> Result<(), String> {
-    let models_dir = app_handle
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("models");
+    let models_dir = get_models_dir(&app_handle)?;
 
     let model_path = models_dir.join(&filename);
     if !model_path.exists() {
@@ -249,11 +238,7 @@ pub fn ensure_model_loaded(
         return Ok(false);
     }
 
-    let models_dir = app_handle
-        .path()
-        .app_local_data_dir()
-        .map_err(|e| e.to_string())?
-        .join("models");
+    let models_dir = get_models_dir(&app_handle)?;
     let model_path = models_dir.join(&config.model_name);
 
     if !model_path.exists() {
@@ -270,6 +255,25 @@ pub fn ensure_model_loaded(
             }
             Ok(false)
         }
+    }
+}
+
+fn get_models_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {
+    #[cfg(debug_assertions)]
+    {
+        let project_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .ok_or("无法获取项目根目录")?
+            .to_path_buf();
+        Ok(project_root.join("models"))
+    }
+    #[cfg(not(debug_assertions))]
+    {
+        app_handle
+            .path()
+            .app_local_data_dir()
+            .map_err(|e| e.to_string())
+            .map(|p| p.join("models"))
     }
 }
 
