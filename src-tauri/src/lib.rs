@@ -60,6 +60,8 @@ pub fn run() {
             commands::settings::check_local_model,
             commands::settings::is_local_model_loaded,
             commands::settings::download_local_model,
+            commands::settings::cancel_download,
+            commands::settings::delete_model,
             commands::settings::load_local_model,
             commands::settings::ensure_model_loaded,
         ])

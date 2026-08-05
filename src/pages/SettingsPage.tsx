@@ -17,6 +17,7 @@ import {
   Upload,
   Trash2,
   Shield,
+  X,
 } from 'lucide-react'
 import { invoke, listen } from '@/lib/tauri'
 import { cn } from '@/lib/utils'
@@ -84,6 +85,7 @@ export default function SettingsPage() {
   const [availableModels, setAvailableModels] = useState<DownloadableModelInfo[]>([])
   const [modelExists, setModelExists] = useState<Record<string, boolean>>({})
   const [downloading, setDownloading] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
   const [downloadProgress, setDownloadProgress] = useState<{
     downloaded: number
     total: number
@@ -118,11 +120,11 @@ export default function SettingsPage() {
   }, [])
 
   useEffect(() => {
-    if (config.provider === 'builtin') {
-      checkModelFiles()
+    if (config.provider === 'builtin' && availableModels.length > 0) {
+      checkModelFiles(availableModels)
       checkModelLoaded()
     }
-  }, [config.provider, config.model_name])
+  }, [config.provider, config.model_name, availableModels])
 
   const loadConfig = async () => {
     try {
@@ -143,14 +145,15 @@ export default function SettingsPage() {
     try {
       const models = await invoke<DownloadableModelInfo[]>('get_available_local_models')
       setAvailableModels(models)
+      checkModelFiles(models)
     } catch {
       // ignore
     }
   }
 
-  const checkModelFiles = async () => {
+  const checkModelFiles = async (models: DownloadableModelInfo[]) => {
     const result: Record<string, boolean> = {}
-    for (const m of availableModels) {
+    for (const m of models) {
       try {
         const exists = await invoke<boolean>('check_local_model', { filename: m.filename })
         result[m.filename] = exists
@@ -246,11 +249,22 @@ export default function SettingsPage() {
       setModelLoaded(true)
     } catch (e) {
       setModelExists((prev) => ({ ...prev, [model.filename]: false }))
-      setImportMessage(`下载失败: ${String(e)}`)
-      setTimeout(() => setImportMessage(null), 6000)
+      const errMsg = String(e)
+      if (!errMsg.includes('已取消')) {
+        setImportMessage(`下载失败: ${errMsg}`)
+        setTimeout(() => setImportMessage(null), 6000)
+      }
     } finally {
       setDownloading(null)
       setDownloadProgress(null)
+    }
+  }
+
+  const handleCancelDownload = async () => {
+    try {
+      await invoke('cancel_download')
+    } catch {
+      // ignore
     }
   }
 
@@ -261,6 +275,23 @@ export default function SettingsPage() {
       setModelLoaded(true)
     } catch (e) {
       console.error('加载失败:', e)
+    }
+  }
+
+  const handleDelete = async (model: DownloadableModelInfo) => {
+    setDeleting(model.filename)
+    try {
+      await invoke('delete_model', { filename: model.filename })
+      setModelExists((prev) => ({ ...prev, [model.filename]: false }))
+      if (config.model_name === model.filename) {
+        setConfig((p) => ({ ...p, model_name: '' }))
+      }
+      setModelLoaded(false)
+    } catch (e) {
+      setImportMessage(`删除失败: ${String(e)}`)
+      setTimeout(() => setImportMessage(null), 4000)
+    } finally {
+      setDeleting(null)
     }
   }
 
@@ -465,7 +496,30 @@ export default function SettingsPage() {
                             >
                               {isSelected ? '已选' : '选择'}
                             </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDelete(m)}
+                              disabled={deleting === m.filename}
+                              className="h-7 w-7 p-0 text-[#64748b] hover:text-[#ef4444] hover:bg-[#ef4444]/10 rounded-lg"
+                            >
+                              {deleting === m.filename ? (
+                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              ) : (
+                                <Trash2 className="w-3.5 h-3.5" />
+                              )}
+                            </Button>
                           </>
+                        ) : isDownloading ? (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCancelDownload}
+                            className="border-[#ef4444]/30 text-[#ef4444] hover:bg-[#ef4444]/10 h-7 text-xs rounded-lg"
+                          >
+                            <X className="w-3 h-3 mr-1" />
+                            取消
+                          </Button>
                         ) : (
                           <Button
                             variant="outline"

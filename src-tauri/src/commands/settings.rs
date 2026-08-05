@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::OnceLock;
 use tauri::{AppHandle, Emitter, Manager, State};
 
 use crate::ai::local_model;
@@ -7,6 +9,8 @@ use crate::db::Database;
 
 const CONFIG_KEY: &str = "ai_config";
 const ALL_CONFIGS_KEY: &str = "ai_configs_all";
+
+static CANCEL_DOWNLOAD: OnceLock<AtomicBool> = OnceLock::new();
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct AiConfig {
@@ -191,6 +195,10 @@ pub async fn download_local_model(
         .find(|m| m.filename == filename)
         .ok_or_else(|| format!("未知模型: {}", filename))?;
 
+    let flag = CANCEL_DOWNLOAD.get_or_init(|| AtomicBool::new(false));
+    flag.store(false, Ordering::SeqCst);
+
+    let filename_clone = filename.clone();
     let app_clone = app_handle.clone();
     let path = local_model::download_model(
         &models_dir,
@@ -199,14 +207,23 @@ pub async fn download_local_model(
             let _ = app_clone.emit("model-download-progress", serde_json::json!({
                 "downloaded": downloaded,
                 "total": total,
-                "filename": filename,
+                "filename": filename_clone,
             }));
         },
+        Some(flag),
     )
     .await?;
 
     let path_str = path.to_string_lossy().to_string();
     Ok(path_str)
+}
+
+#[tauri::command]
+pub fn cancel_download() -> Result<(), String> {
+    if let Some(flag) = CANCEL_DOWNLOAD.get() {
+        flag.store(true, Ordering::SeqCst);
+    }
+    Ok(())
 }
 
 #[tauri::command]
@@ -256,6 +273,30 @@ pub fn ensure_model_loaded(
             Ok(false)
         }
     }
+}
+
+#[tauri::command]
+pub fn delete_model(
+    filename: String,
+    app_handle: AppHandle,
+) -> Result<String, String> {
+    let models_dir = get_models_dir(&app_handle)?;
+    let file_path = models_dir.join(&filename);
+
+    if !file_path.exists() {
+        return Err(format!("模型文件不存在: {}", filename));
+    }
+
+    if local_model::is_model_loaded() {
+        log::info!("删除模型前先卸载: {}", filename);
+        local_model::unload_model();
+    }
+
+    std::fs::remove_file(&file_path)
+        .map_err(|e| format!("删除模型文件失败: {}", e))?;
+
+    log::info!("已删除模型文件: {}", filename);
+    Ok(format!("已删除模型: {}", filename))
 }
 
 fn get_models_dir(app_handle: &AppHandle) -> Result<PathBuf, String> {

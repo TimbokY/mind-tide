@@ -8,6 +8,7 @@ use llama_cpp_2::token::LlamaToken;
 use serde::{Deserialize, Serialize};
 use std::num::NonZero;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::sync::OnceLock;
 
@@ -69,6 +70,7 @@ pub async fn download_model(
     models_dir: &PathBuf,
     model: &DownloadableModel,
     on_progress: impl Fn(u64, u64) + Send + 'static,
+    cancel_flag: Option<&AtomicBool>,
 ) -> Result<PathBuf, String> {
     std::fs::create_dir_all(models_dir).map_err(|e| e.to_string())?;
 
@@ -90,6 +92,13 @@ pub async fn download_model(
     use futures_util::StreamExt;
     use std::io::Write;
     while let Some(chunk) = stream.next().await {
+        if let Some(flag) = cancel_flag {
+            if flag.load(Ordering::Relaxed) {
+                drop(file);
+                let _ = std::fs::remove_file(&file_path);
+                return Err("下载已取消".into());
+            }
+        }
         let chunk = chunk.map_err(|e| format!("下载失败: {}", e))?;
         file.write_all(&chunk).map_err(|e| e.to_string())?;
         downloaded += chunk.len() as u64;
@@ -248,6 +257,18 @@ pub fn is_model_loaded() -> bool {
         .get()
         .and_then(|cell| cell.lock().ok())
         .map(|guard| guard.is_some())
+        .unwrap_or(false)
+}
+
+pub fn unload_model() -> bool {
+    LOCAL_MODEL
+        .get()
+        .and_then(|cell| cell.lock().ok())
+        .map(|mut guard| {
+            let had_model = guard.is_some();
+            *guard = None;
+            had_model
+        })
         .unwrap_or(false)
 }
 
