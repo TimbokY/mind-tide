@@ -1,5 +1,5 @@
 [package]
-name = "梦潮汐"
+name = "mind-tide"
 version = "0.1.0"
 description = "梦潮汐 - 梦境记录与情绪可视化系统"
 authors = ["timbok"]

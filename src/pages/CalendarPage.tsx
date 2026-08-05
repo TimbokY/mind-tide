@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback } from 'react'
+import { useState, useMemo, useRef, useCallback, useEffect } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { invoke } from '@/lib/tauri'
 import { GlowCard } from '@/components/ui/glow-card'
@@ -49,6 +49,17 @@ export default function CalendarPage() {
   const queryClient = useQueryClient()
   const dateRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
+  const isFirstLoad = useRef(true)
+
+  const scrollToDate = useCallback((date: string) => {
+    setHighlightDate(date)
+    const el = dateRefs.current.get(date)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+    setTimeout(() => setHighlightDate(null), 2000)
+  }, [])
+
   const { data: groups } = useQuery({
     queryKey: ['dreamsByMonth', year, month],
     queryFn: async () => {
@@ -66,6 +77,16 @@ export default function CalendarPage() {
       return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date))
     },
   })
+
+  useEffect(() => {
+    if (!isFirstLoad.current || !groups || groups.length === 0) return
+    isFirstLoad.current = false
+    const today = new Date().toISOString().slice(0, 10)
+    const todayGroup = groups.find(g => g.date === today)
+    if (todayGroup) {
+      requestAnimationFrame(() => scrollToDate(today))
+    }
+  }, [groups, scrollToDate])
 
   const moodDist = useMemo(() => {
     const d: { name: string; value: number; color: string }[] = []
@@ -118,15 +139,6 @@ export default function CalendarPage() {
     if (month === 12) { setMonth(1); setYear((y) => y + 1) }
     else setMonth((m) => m + 1)
   }, [month])
-
-  const scrollToDate = useCallback((date: string) => {
-    setHighlightDate(date)
-    const el = dateRefs.current.get(date)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    }
-    setTimeout(() => setHighlightDate(null), 2000)
-  }, [])
 
   const handleDelete = useCallback(async (id: string) => {
     try {
