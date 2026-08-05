@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { MoodTrendChart } from '@/components/charts/MoodTrendChart'
 import { EmotionRadar } from '@/components/charts/EmotionRadar'
 import { DreamHeatmap } from '@/components/charts/DreamHeatmap'
-import { WordCloud } from '@/components/charts/WordCloud'
+import { BubbleChart } from '@/components/charts/BubbleChart'
 import { cn } from '@/lib/utils'
 import {
   Sparkles, Loader2, Lightbulb, RefreshCw,
@@ -365,20 +365,20 @@ export default function InsightsPage() {
       </div>
 
       <GlowCard className="p-5">
-        <h3 className="text-sm font-medium text-[#94a3b8] mb-4">梦境高频词云 · 标签 vs AI 象征</h3>
+        <h3 className="text-sm font-medium text-[#94a3b8] mb-4">梦境高频气泡 · 标签 vs AI 象征</h3>
         <div className="space-y-6">
           <div className="space-y-2">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#8b5cf6]" />
               <span className="text-[11px] text-[#64748b]">你的标签</span>
             </div>
-            <div className="flex justify-center min-h-[220px] items-center bg-white/[0.01] rounded-xl">
-              <WordCloud
+            <div className="flex justify-center min-h-[320px] items-center bg-white/[0.01] rounded-xl">
+              <BubbleChart
                 words={tags ?? []}
                 width={700}
-                height={220}
+                height={320}
                 colorScheme="purple"
-                maxWords={20}
+                maxWords={15}
               />
             </div>
           </div>
@@ -387,13 +387,13 @@ export default function InsightsPage() {
               <span className="w-2 h-2 rounded-full bg-[#14b8a6]" />
               <span className="text-[11px] text-[#64748b]">AI 象征元素</span>
             </div>
-            <div className="flex justify-center min-h-[220px] items-center bg-white/[0.01] rounded-xl">
-              <WordCloud
+            <div className="flex justify-center min-h-[320px] items-center bg-white/[0.01] rounded-xl">
+              <BubbleChart
                 words={aiSymbols ?? []}
                 width={700}
-                height={220}
+                height={320}
                 colorScheme="teal"
-                maxWords={20}
+                maxWords={15}
               />
             </div>
           </div>

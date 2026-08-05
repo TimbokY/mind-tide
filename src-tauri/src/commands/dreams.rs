@@ -423,7 +423,7 @@ pub fn export_dreams(db: State<Database>) -> Result<String, String> {
 }
 
 #[tauri::command]
-pub fn export_dreams_file(app_handle: AppHandle, db: State<Database>) -> Result<String, String> {
+pub async fn export_dreams_file(app_handle: AppHandle, db: State<'_, Database>) -> Result<String, String> {
     let json = export_dreams(db)?;
     let date_str = chrono::Local::now().format("%Y-%m-%d").to_string();
     let default_name = format!("dream-tide-export-{}.json", date_str);
