@@ -778,12 +778,12 @@ export default function SettingsPage() {
                 <Input
                   value={clearConfirmText}
                   onChange={(e) => setClearConfirmText(e.target.value)}
-                  placeholder='请输入"确认删除"'
+                  placeholder='请输入"确认清除"'
                   className="h-8 w-40 text-xs bg-white/5 border-white/10 text-[#f8fafc] rounded-lg"
                 />
                 <Button
                   onClick={handleClearAll}
-                  disabled={clearConfirmText !== '确认删除' || clearing}
+                  disabled={clearConfirmText !== '确认清除' || clearing}
                   className="bg-[#ef4444] hover:bg-[#dc2626] text-white rounded-lg text-xs h-8"
                 >
                   {clearing ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
