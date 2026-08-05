@@ -1,6 +1,6 @@
 [package]
 name = "mind-tide"
-version = "0.1.0"
+version = "0.1.1"
 description = "MindTide - 梦境记录与情绪可视化系统"
 authors = ["timbok"]
 license = ""
