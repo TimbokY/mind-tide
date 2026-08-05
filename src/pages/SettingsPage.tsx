@@ -20,13 +20,7 @@ import {
 } from 'lucide-react'
 import { invoke, listen } from '@/lib/tauri'
 import { cn } from '@/lib/utils'
-
-interface AiConfig {
-  provider: string
-  api_url: string
-  api_key: string
-  model_name: string
-}
+import type { AiConfig } from '@/types'
 
 interface OllamaModel {
   name: string

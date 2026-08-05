@@ -20,16 +20,14 @@ import {
   BarChart3,
   AlertTriangle,
   X,
+  Flame,
+  Star,
+  Wind,
 } from 'lucide-react'
 import { invoke } from '@/lib/tauri'
 import { cn } from '@/lib/utils'
-
-interface AiConfig {
-  provider: string
-  api_url: string
-  api_key: string
-  model_name: string
-}
+import type { AiConfig } from '@/types'
+import { moodLabels } from '@/constants/moods'
 
 interface DreamInput {
   title: string
@@ -59,18 +57,13 @@ interface AiResult {
 
 const moods = [
   { value: 'joy', label: '喜悦', icon: Smile, color: '#10b981' },
-  { value: 'neutral', label: '中性', icon: Meh, color: '#f59e0b' },
   { value: 'sadness', label: '悲伤', icon: Frown, color: '#ef4444' },
+  { value: 'anger', label: '愤怒', icon: Flame, color: '#f97316' },
+  { value: 'fear', label: '恐惧', icon: Zap, color: '#f59e0b' },
+  { value: 'surprise', label: '惊讶', icon: Star, color: '#eab308' },
+  { value: 'calm', label: '平静', icon: Wind, color: '#8b5cf6' },
+  { value: 'neutral', label: '中性', icon: Meh, color: '#64748b' },
 ]
-
-const moodLabels: Record<string, string> = {
-  joy: '喜悦',
-  sadness: '悲伤',
-  fear: '恐惧',
-  anger: '愤怒',
-  surprise: '惊讶',
-  calm: '平静',
-}
 
 export default function EditorPage() {
   const navigate = useNavigate()
@@ -423,7 +416,7 @@ export default function EditorPage() {
           <div className="space-y-4">
             <div>
               <Label className="text-xs text-[#94a3b8] mb-2 block">情绪</Label>
-              <div className="flex gap-2">
+              <div className="grid grid-cols-4 gap-1.5">
                 {moods.map((mood) => (
                   <button
                     key={mood.value}
@@ -431,7 +424,7 @@ export default function EditorPage() {
                       setForm((prev) => ({ ...prev, user_mood: mood.value }))
                     }
                     className={cn(
-                      'flex-1 flex flex-col items-center gap-1 py-2 rounded-lg text-xs transition-all',
+                      'flex flex-col items-center gap-1 py-2 rounded-lg text-[11px] transition-all',
                       form.user_mood === mood.value
                         ? 'bg-white/10 text-[#f8fafc] ring-1 ring-white/20'
                         : 'text-[#64748b] hover:text-[#f8fafc] hover:bg-white/5',
