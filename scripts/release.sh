@@ -11,7 +11,10 @@ echo "当前版本: v$current"
 echo ""
 read -rp "请输入新版本号 (例如 0.2.0): " new || true
 
-if [ -z "${new:-}" ] || ! echo "$new" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+if [ -z "${new:-}" ]; then
+  new="$current"
+  echo "未输入版本号，使用当前版本: v$new"
+elif ! echo "$new" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
   echo "错误: 版本号格式不正确，应为 x.y.z"
   exit 1
 fi
@@ -64,5 +67,5 @@ git -C "$ROOT" push
 git -C "$ROOT" push origin "v$new"
 
 echo ""
-echo "✔ 已推送 tag v$new，GitHub Actions 将自动开始构建。"
+echo "✔ 已推送 tag v${new}，GitHub Actions 将自动开始构建。"
 echo "查看进度: https://github.com/TimbokY/mind-tide/actions"
