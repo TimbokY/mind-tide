@@ -32,6 +32,15 @@
       "deb",
       "appimage"
     ],
+    "nsis": {
+      "installMode": "currentUser",
+      "installerIcon": "icons/icon.ico",
+      "displayLanguageSelector": true,
+      "languages": [
+        "SimpChinese",
+        "English"
+      ]
+    },
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
