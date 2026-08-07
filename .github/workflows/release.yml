@@ -53,7 +53,7 @@ jobs:
           tagName: ${{ github.event.inputs.version || github.ref_name }}
           releaseName: 'MindTide v__VERSION__'
           releaseBody: |
-            构建产物见附件。macOS 用户首次打开时若提示不受信任，请右键点击 App → 打开，或执行 `xattr -cr /Applications/MindTide.app`。windows 用户使用管理员身份安装。
+            构建产物见附件。macOS 用户首次打开时若提示不受信任，请右键点击 App → 打开，或执行 `xattr -cr /Applications/MindTide.app`。
 
             ## 更新日志
 
