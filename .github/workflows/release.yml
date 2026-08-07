@@ -25,9 +25,6 @@ jobs:
       - name: Install Rust stable
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Add macOS targets (arm64 + x86_64)
-        run: rustup target add aarch64-apple-darwin x86_64-apple-darwin universal-apple-darwin
-
       - name: Install frontend dependencies
         run: npm ci
 
@@ -48,60 +45,22 @@ jobs:
           echo "$BODY" >> "$GITHUB_OUTPUT"
           echo "EOF" >> "$GITHUB_OUTPUT"
 
-      - name: Build universal macOS app
-        run: npx tauri build --target universal-apple-darwin --bundles app dmg
-
-      - name: Package .pkg with postinstall (auto clear quarantine)
-        id: pkg
+      - uses: tauri-apps/tauri-action@v0
         env:
-          APP_PATH: src-tauri/target/universal-apple-darwin/release/bundle/macos/MindTide.app
-          VERSION: ${{ github.event.inputs.version || github.ref_name }}
-        run: |
-          set -euo pipefail
-          APP_PATH="src-tauri/target/universal-apple-darwin/release/bundle/macos/MindTide.app"
-          WS="/tmp/pkg"
-          rm -rf "$WS" && mkdir -p "$WS/payload/Applications" "$WS/scripts"
-          cp -R "$APP_PATH" "$WS/payload/Applications/"
-          codesign --force --deep -s - "$WS/payload/Applications/MindTide.app"
-          cat > "$WS/scripts/postinstall" <<'EOF'
-          #!/bin/bash
-          set -e
-          /usr/bin/xattr -cr "/Applications/MindTide.app" || true
-          exit 0
-          EOF
-          chmod +x "$WS/scripts/postinstall"
-          VERSION="${VERSION#v}"
-          pkgbuild \
-            --install-location / \
-            --root "$WS/payload" \
-            --scripts "$WS/scripts" \
-            --identifier com.mindtide.app \
-            --version "$VERSION" \
-            --ownership recommended \
-            "$WS/MindTide-$VERSION-universal.pkg"
-          DIST="/tmp/pkgdist"
-          rm -rf "$DIST" && mkdir -p "$DIST"
-          cp "$WS/MindTide-$VERSION-universal.pkg" "$DIST/"
-          cp -R "$APP_PATH" "$DIST/"
-          cp src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg "$DIST/"
-          echo "pkg_path=$DIST" >> "$GITHUB_OUTPUT"
-
-      - name: Upload macOS assets to release
-        uses: softprops/action-gh-release@v2
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ''
         with:
-          tag_name: ${{ github.event.inputs.version || github.ref_name }}
-          draft: true
-          prerelease: false
-          body: |
-            构建产物见附件。macOS 安装 `.pkg`，安装时已自动清理隔离属性，装完可直接双击打开（同时支持 Apple Silicon 与 Intel Mac）。
+          tagName: ${{ github.event.inputs.version || github.ref_name }}
+          releaseName: 'MindTide v__VERSION__'
+          releaseBody: |
+            构建产物见附件。macOS 用户首次打开时若提示不受信任，请右键点击 App → 打开，或执行 `xattr -cr /Applications/MindTide.app`。windows 用户使用管理员身份安装。
 
             ## 更新日志
 
             ${{ steps.notes.outputs.notes }}
-          files: |
-            /tmp/pkgdist/MindTide-*.pkg
-            /tmp/pkgdist/MindTide.app
-            /tmp/pkgdist/*.dmg
+          releaseDraft: true
+          prerelease: false
+          args: --bundles dmg app
 
   build-windows:
     runs-on: windows-latest
